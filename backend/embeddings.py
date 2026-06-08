@@ -4,6 +4,7 @@ Embedding utilities.
 • Uses Voyage AI's voyage-3 model via the voyageai SDK.
 • Falls back to keyword/category matching if VOYAGE_API_KEY is not set.
 • Run   python3.11 embeddings.py   once to pre-build all embeddings.
+• Works with both MySQL and PostgreSQL — DB_TYPE is detected automatically.
 """
 
 import json
@@ -11,14 +12,14 @@ import math
 import os
 from typing import Optional
 
-from database import DB_connection
+from database import DB_connection, DB_TYPE
 
 VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY")
 EMBED_MODEL    = "voyage-3"
 EMBED_DIM      = 1024
 
 
-# ── Voyage client (singleton) ──────────────────────────────────────────────────
+# ── Voyage client ─────────────────────────────────────────────────────────────
 def _client():
     import voyageai
     return voyageai.Client(api_key=VOYAGE_API_KEY)
@@ -26,10 +27,6 @@ def _client():
 
 # ── Text fingerprint for a product ────────────────────────────────────────────
 def product_text(product: dict) -> str:
-    """
-    Concatenates all searchable fields into a single string for embedding.
-    Gracefully handles missing fields.
-    """
     parts = [
         product.get("name", ""),
         product.get("category", "") or "",
@@ -53,45 +50,32 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
     return dot / (na * nb) if na and nb else 0.0
 
 
-# ── Generate a single embedding via Voyage AI ──────────────────────────────────
+# ── Generate a single embedding ────────────────────────────────────────────────
 def get_embedding(text: str) -> list[float]:
     result = _client().embed([text], model=EMBED_MODEL, input_type="document")
     return result.embeddings[0]
 
 
-# ── Batch-generate embeddings for multiple texts ───────────────────────────────
+# ── Batch-generate embeddings ──────────────────────────────────────────────────
 def get_embeddings_batch(texts: list[str]) -> list[list[float]]:
-    """Send all texts to Voyage in one API call — much faster than one-by-one."""
     result = _client().embed(texts, model=EMBED_MODEL, input_type="document")
     return result.embeddings
 
 
-# ── Upsert embedding for one product ──────────────────────────────────────────
+# ── Upsert one embedding ───────────────────────────────────────────────────────
 def upsert_product_embedding(product_id: int, embedding: list[float]):
     conn = DB_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO product_embeddings (product_id, embedding)
-                VALUES (%s, %s)
-                ON CONFLICT (product_id) DO UPDATE
-                    SET embedding  = EXCLUDED.embedding,
+            if DB_TYPE == "mysql":
+                cur.execute("""
+                    INSERT INTO product_embeddings (product_id, embedding)
+                    VALUES (%s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        embedding  = VALUES(embedding),
                         updated_at = CURRENT_TIMESTAMP
-            """, (product_id, json.dumps(embedding)))
-        conn.commit()
-    finally:
-        conn.close()
-
-
-# ── Batch upsert embeddings for multiple products ─────────────────────────────
-def upsert_embeddings_batch(id_embedding_pairs: list[tuple[int, list[float]]]):
-    """Insert or update embeddings for multiple products in one transaction."""
-    if not id_embedding_pairs:
-        return
-    conn = DB_connection()
-    try:
-        with conn.cursor() as cur:
-            for product_id, embedding in id_embedding_pairs:
+                """, (product_id, json.dumps(embedding)))
+            else:
                 cur.execute("""
                     INSERT INTO product_embeddings (product_id, embedding)
                     VALUES (%s, %s)
@@ -104,7 +88,36 @@ def upsert_embeddings_batch(id_embedding_pairs: list[tuple[int, list[float]]]):
         conn.close()
 
 
-# ── Load stored embedding for a single product ────────────────────────────────
+# ── Batch upsert embeddings ────────────────────────────────────────────────────
+def upsert_embeddings_batch(id_embedding_pairs: list[tuple[int, list[float]]]):
+    if not id_embedding_pairs:
+        return
+    conn = DB_connection()
+    try:
+        with conn.cursor() as cur:
+            for product_id, embedding in id_embedding_pairs:
+                if DB_TYPE == "mysql":
+                    cur.execute("""
+                        INSERT INTO product_embeddings (product_id, embedding)
+                        VALUES (%s, %s)
+                        ON DUPLICATE KEY UPDATE
+                            embedding  = VALUES(embedding),
+                            updated_at = CURRENT_TIMESTAMP
+                    """, (product_id, json.dumps(embedding)))
+                else:
+                    cur.execute("""
+                        INSERT INTO product_embeddings (product_id, embedding)
+                        VALUES (%s, %s)
+                        ON CONFLICT (product_id) DO UPDATE
+                            SET embedding  = EXCLUDED.embedding,
+                                updated_at = CURRENT_TIMESTAMP
+                    """, (product_id, json.dumps(embedding)))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+# ── Load one stored embedding ──────────────────────────────────────────────────
 def load_embedding(product_id: int) -> Optional[list[float]]:
     conn = DB_connection()
     try:
@@ -122,13 +135,8 @@ def load_embedding(product_id: int) -> Optional[list[float]]:
         conn.close()
 
 
-# ── Batch-load stored embeddings for multiple products ────────────────────────
+# ── Batch-load embeddings (single DB query) ────────────────────────────────────
 def batch_load_embeddings(product_ids: list[int]) -> dict[int, list[float]]:
-    """
-    Fetch all stored embeddings for the given IDs in a SINGLE database query.
-    Returns a dict mapping product_id → embedding vector.
-    Missing IDs are simply absent from the result.
-    """
     if not product_ids:
         return {}
     conn = DB_connection()
@@ -151,12 +159,8 @@ def batch_load_embeddings(product_ids: list[int]) -> dict[int, list[float]]:
     return result
 
 
-# ── Pre-build ALL embeddings (run once after setup) ───────────────────────────
+# ── Pre-build ALL embeddings (run once) ────────────────────────────────────────
 def build_all_embeddings():
-    """
-    Call this script directly:   python3.11 embeddings.py
-    Embeds every product that doesn't yet have a stored embedding.
-    """
     conn = DB_connection()
     try:
         with conn.cursor() as cur:
@@ -176,15 +180,13 @@ def build_all_embeddings():
         return
 
     print(f"Building embeddings for {len(products)} products ...")
-    texts = [product_text(p) for p in products]
+    texts      = [product_text(p) for p in products]
     embeddings = get_embeddings_batch(texts)
-
-    pairs = [(p["id"], emb) for p, emb in zip(products, embeddings)]
+    pairs      = [(p["id"], emb) for p, emb in zip(products, embeddings)]
     upsert_embeddings_batch(pairs)
 
     for p in products:
         print(f"  product_id={p['id']}  {p['name']}")
-
     print("Done.")
 
 

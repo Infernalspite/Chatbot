@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 # Load env variables (such as GROQ_API_KEY) from .env file
 load_dotenv()
 
-from database import DB_connection
+from database import DB_connection, DB_TYPE
 from auth import hash_password, verify_password, create_access_token
 import rbac
 import mange
@@ -203,9 +203,12 @@ def create_order(payload: Order):
     try:
         connection = DB_connection()
         with connection.cursor() as cursor:
-            sql_order = "INSERT INTO orders (user_id) VALUES (%s) RETURNING id"
-            cursor.execute(sql_order, (payload.user_id,))
-            order_id = cursor.fetchone()["id"]
+            if DB_TYPE == "mysql":
+                cursor.execute("INSERT INTO orders (user_id) VALUES (%s)", (payload.user_id,))
+                order_id = cursor.lastrowid
+            else:
+                cursor.execute("INSERT INTO orders (user_id) VALUES (%s) RETURNING id", (payload.user_id,))
+                order_id = cursor.fetchone()["id"]
             
             sql_item = "INSERT INTO order_items (order_id, product_id, quantity) VALUES (%s, %s, %s)"
             for item in payload.items:

@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Path, Header, Depends
 from typing import List, Optional
 from schema import Product, RoleUpdate
 from rbac import RoleChecker, get_current_user
-from database import DB_connection
+from database import DB_connection, DB_TYPE
 
 router = APIRouter()
 
@@ -110,9 +110,14 @@ def create_product(product: Product, current_user: dict = Depends(get_current_us
             if not user_result or user_result.get('role') not in ['manager', 'admin']:
                 raise HTTPException(status_code=403, detail="Manager or Admin access required")
             
-            sql = "INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s) RETURNING id"
-            cursor.execute(sql, (product.name, product.price, product.stock, product.image_url))
-            product_id = cursor.fetchone()["id"]
+            if DB_TYPE == "mysql":
+                cursor.execute("INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s)",
+                               (product.name, product.price, product.stock, product.image_url))
+                product_id = cursor.lastrowid
+            else:
+                cursor.execute("INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s) RETURNING id",
+                               (product.name, product.price, product.stock, product.image_url))
+                product_id = cursor.fetchone()["id"]
             connection.commit()
             return {"message": "Product created successfully", "product_id": product_id}
     except HTTPException as he:
