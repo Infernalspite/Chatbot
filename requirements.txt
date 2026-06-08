@@ -1,0 +1,9 @@
+fastapi
+streamlit
+requests
+pymysql
+uvicorn
+PyJWT
+bcrypt
+python-dotenv
+voyageai

@@ -1,0 +1,2 @@
+- [PostgreSQL migration](pg-migration.md) — original code used MySQL/pymysql; Replit only has PostgreSQL via DATABASE_URL secret.
+- [Recommendation engine optimisation](rec-engine.md) — batch_load_embeddings() replaces N+1 per-product DB queries; batch Voyage AI calls for missing embeddings.
