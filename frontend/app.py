@@ -1,5 +1,6 @@
 # pyrefly: ignore [missing-import]
 import streamlit as st
+import os
 import requests
 import pandas as pd
 from datetime import datetime
@@ -8,7 +9,7 @@ from datetime import datetime
 st.set_page_config(page_title="Shopping Store", layout="wide")
 
 # Backend API URL
-API_URL = "http://localhost:8001"
+API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 # Initialize session state
 if "cart" not in st.session_state:

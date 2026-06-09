@@ -9,10 +9,7 @@ expertMode = true
 [userenv]
 
 [userenv.shared]
-DB_HOST = "localhost"
-DB_USER = "root"
-DB_NAME = "fakedb"
-DB_PORT = "3030"
+API_URL = "http://localhost:8000"
 
 [workflows]
 runButton = "Project"
@@ -39,7 +36,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd backend && python3.11 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+args = "pip install -r requirements.txt && cd backend && python3.11 setup_db.py && python3.11 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
 waitForPort = 8000
 
 [[workflows.workflow]]
@@ -48,7 +45,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd frontend && python3.11 -m streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.headless true"
+args = "pip install -r requirements.txt && cd frontend && python3.11 -m streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.headless true"
 waitForPort = 5000
 
 [workflows.workflow.metadata]

@@ -1,9 +1,11 @@
 fastapi
 streamlit
 requests
+pandas
 pymysql
 uvicorn
 PyJWT
 bcrypt
 python-dotenv
 voyageai
+psycopg2-binary
