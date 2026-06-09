@@ -8,7 +8,7 @@ from datetime import datetime
 st.set_page_config(page_title="Shopping Store", layout="wide")
 
 # Backend API URL
-API_URL = "http://localhost:8000"
+API_URL = "http://localhost:8001"
 
 # Initialize session state
 if "cart" not in st.session_state:
@@ -23,6 +23,125 @@ if "token" not in st.session_state:
     st.session_state.token = None
 if "recommendations" not in st.session_state:       # ← RECOMMENDATION ENGINE
     st.session_state.recommendations = []            # ← RECOMMENDATION ENGINE
+
+if "recommendation_source_id" not in st.session_state:
+    st.session_state.recommendation_source_id = None
+
+
+def fetch_recommendations(product_id: int, limit: int = 4):
+    cart_ids = ",".join(str(item["product_id"]) for item in st.session_state.cart)
+    try:
+        rec_res = requests.get(
+            f"{API_URL}/recommendations/{product_id}",
+            params={"limit": limit, "exclude_ids": cart_ids},
+            timeout=5,
+        )
+        if rec_res.status_code == 200:
+            st.session_state.recommendations = rec_res.json().get("recommendations", [])
+            st.session_state.recommendation_source_id = product_id
+        else:
+            st.session_state.recommendations = []
+            st.session_state.recommendation_source_id = None
+    except Exception:
+        st.session_state.recommendations = []
+        st.session_state.recommendation_source_id = None
+
+
+def add_item_to_cart(product: dict, quantity: int = 1):
+    existing = next(
+        (item for item in st.session_state.cart if item["product_id"] == product["id"]),
+        None,
+    )
+    if existing:
+        existing["quantity"] += quantity
+    else:
+        st.session_state.cart.append({
+            "product_id": product["id"],
+            "name": product["name"],
+            "price": product["price"],
+            "quantity": quantity,
+        })
+    fetch_recommendations(product["id"])
+
+
+def render_recommendations_for(source_id: int, key_prefix: str):
+    if (
+        st.session_state.recommendation_source_id != source_id
+        or not st.session_state.recommendations
+    ):
+        return
+
+    st.markdown("#### You Might Also Like")
+    rec_cols = st.columns(min(len(st.session_state.recommendations), 2))
+    for ri, rec in enumerate(st.session_state.recommendations):
+        with rec_cols[ri % len(rec_cols)]:
+            with st.container(border=True):
+                rec_img = rec.get("image_url") or (
+                    "https://images.unsplash.com/photo-1531403009284"
+                    "-440f080d1e12?w=500&auto=format&fit=crop&q=80"
+                )
+                st.image(rec_img, use_container_width=True)
+                st.markdown(f"**{rec['name']}**")
+                st.markdown(f"${rec['price']:.2f}")
+                if st.button(
+                    "Add to Cart",
+                    key=f"{key_prefix}_rec_add_{source_id}_{rec['id']}_{ri}",
+                    use_container_width=True,
+                ):
+                    add_item_to_cart(rec, 1)
+                    st.success(f"Added {rec['name']}!")
+                    st.rerun()
+
+
+def response_detail(response, fallback: str = "Unknown error"):
+    try:
+        data = response.json()
+        if isinstance(data, dict):
+            return data.get("detail") or data.get("message") or fallback
+        return fallback
+    except ValueError:
+        return response.text.strip() or fallback
+
+
+def render_shop_product_card(product: dict, key_prefix: str):
+    with st.container(border=True):
+        img_url = product.get('image_url')
+        default_placeholder = "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500&auto=format&fit=crop&q=80"
+        if not img_url:
+            img_url = default_placeholder
+
+        st.image(img_url, use_container_width=True)
+        st.markdown(f"### {product['name']}")
+        st.markdown(f"**Price:** ${product['price']:.2f}")
+
+        stock = product['stock']
+        if stock > 10:
+            st.markdown(f"🟢 **Stock:** {stock} units")
+        elif 0 < stock <= 10:
+            st.markdown(f"🟡 **Stock:** Low Stock ({stock} left!)")
+        else:
+            st.markdown("🔴 **Stock:** Out of Stock")
+
+        qty = st.number_input(
+            "Quantity",
+            min_value=1,
+            max_value=max(1, product['stock']),
+            value=1,
+            disabled=product['stock'] <= 0,
+            key=f"{key_prefix}_qty_{product['id']}"
+        )
+
+        if st.button(
+            "Add to Cart",
+            key=f"{key_prefix}_add_{product['id']}",
+            width='stretch',
+            disabled=product['stock'] <= 0,
+        ):
+            add_item_to_cart(product, qty)
+            st.success(f"Added {qty} to cart!")
+
+        render_recommendations_for(product["id"], key_prefix)
+
 
 # =============== PRODUCT MANAGEMENT HELPERS ===============
 def render_add_product(key_prefix: str):
@@ -260,7 +379,7 @@ def handle_login(username, password, expected_role):
             elif response.status_code == 404:
                 st.error("❌ User not found. Please check your username.")
             else:
-                st.error(f"❌ Login failed: {response.json().get('detail', 'Unknown error')}")
+                st.error(f"❌ Login failed: {response_detail(response)}")
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
     else:
@@ -390,98 +509,82 @@ def home_page():
     with tab_shop:
         st.subheader("Available Products")
         
-        col1, col2 = st.columns([3, 1])
+        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
         with col1:
-            search_name = st.text_input("🔍 Search products")
+            search_name = st.text_input("AI filter", placeholder="e.g. cheap electronics, desk items under 50")
         with col2:
-            refresh = st.button("🔄 Refresh")
+            selected_category = st.selectbox(
+                "Category",
+                ["All", "Electronics", "Furniture", "Cosmetics", "Other"],
+                key="shop_category_filter",
+            )
+        with col3:
+            selected_sort = st.selectbox(
+                "Sort",
+                ["AI best match", "Name A-Z", "Price low-high", "Price high-low", "Most stock"],
+                key="shop_sort_filter",
+            )
+        with col4:
+            refresh = st.button("Refresh")
         
-        try:
-            response = requests.get(f"{API_URL}/products")
-            if response.status_code == 200:
-                products = response.json()
-                
-                # Filter by search
-                if search_name:
-                    products = [p for p in products if search_name.lower() in p["name"].lower()]
-                
-                if products:
-                    # Display products in a grid
-                    cols = st.columns(3)
-                    for idx, product in enumerate(products):
-                        with cols[idx % 3]:
-                            with st.container(border=True):
-                                # Display product image or default placeholder
-                                img_url = product.get('image_url')
-                                default_placeholder = "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500&auto=format&fit=crop&q=80"
-                                if not img_url:
-                                    img_url = default_placeholder
-                                
-                                st.image(img_url, use_container_width=True)
-                                
-                                st.markdown(f"### {product['name']}")
-                                st.markdown(f"**Price:** ${product['price']:.2f}")
-                                
-                                # Stock status styling
-                                stock = product['stock']
-                                if stock > 10:
-                                    st.markdown(f"🟢 **Stock:** {stock} units")
-                                elif 0 < stock <= 10:
-                                    st.markdown(f"🟡 **Stock:** Low Stock ({stock} left!)")
-                                else:
-                                    st.markdown("🔴 **Stock:** Out of Stock")
-                                
-                                qty = st.number_input(
-                                    "Quantity",
-                                    min_value=1,
-                                    max_value=max(1, product['stock']),
-                                    value=1,
-                                    disabled=product['stock'] <= 0,
-                                    key=f"qty_{product['id']}"
-                                )
-                                
-                                if st.button("Add to Cart", key=f"add_{product['id']}", width='stretch', disabled=product['stock'] <= 0):
-                                    # ── 1. Add item to cart (original logic) ──────────────
-                                    existing = next((item for item in st.session_state.cart 
-                                                   if item['product_id'] == product['id']), None)
-                                    if existing:
-                                        existing['quantity'] += qty
-                                    else:
-                                        st.session_state.cart.append({
-                                            'product_id': product['id'],
-                                            'name': product['name'],
-                                            'price': product['price'],
-                                            'quantity': qty
-                                        })
-                                    st.success(f"✅ Added {qty} to cart!")
+        categories = ["Electronics", "Furniture", "Cosmetics", "Other"]
+        category_labels = {
+            "Electronics": "Electronics",
+            "Furniture": "Furniture",
+            "Cosmetics": "Cosmetics",
+            "Other": "Other",
+        }
 
-                                    # ── 2. Fetch recommendations ← RECOMMENDATION ENGINE ──
-                                    cart_ids = ",".join(
-                                        str(i['product_id']) for i in st.session_state.cart
-                                    )
-                                    try:
-                                        rec_res = requests.get(
-                                            f"{API_URL}/recommendations/{product['id']}",
-                                            params={"limit": 4, "exclude_ids": cart_ids},
-                                            timeout=5,
-                                        )
-                                        if rec_res.status_code == 200:
-                                            st.session_state.recommendations = (
-                                                rec_res.json().get("recommendations", [])
-                                            )
-                                        else:
-                                            st.session_state.recommendations = []
-                                    except Exception:
-                                        st.session_state.recommendations = []
+        grouped_products = None
+        with st.spinner("Filtering products..."):
+            try:
+                sort_map = {
+                    "AI best match": "ai",
+                    "Name A-Z": "name_asc",
+                    "Price low-high": "price_low",
+                    "Price high-low": "price_high",
+                    "Most stock": "stock_high",
+                }
+                response = requests.post(
+                    f"{API_URL}/api/products/filter",
+                    json={
+                        "query": search_name,
+                        "category": None if selected_category == "All" else selected_category,
+                        "sort_by": sort_map[selected_sort],
+                    },
+                    timeout=20,
+                )
+                if response.status_code == 200:
+                    filter_payload = response.json()
+                    grouped_products = filter_payload.get("grouped", {})
+                    if search_name or selected_category != "All" or selected_sort != "AI best match":
+                        match_count = filter_payload.get("count", 0)
+                        st.caption(f"AI filter found {match_count} matching products")
                 else:
-                    st.info("No products found")
-            else:
-                st.error("Could not fetch products")
-        except Exception as e:
-            st.error(f"Error fetching products: {str(e)}")
+                    st.error(f"Could not filter products: {response_detail(response)}")
+            except Exception as e:
+                st.error(f"Error filtering products: {str(e)}")
+
+        if grouped_products:
+            rendered_any = False
+            for category in categories:
+                products = grouped_products.get(category, [])
+
+                if not products:
+                    continue
+
+                rendered_any = True
+                st.markdown(f"## {category_labels[category]}")
+                cols = st.columns(3)
+                for idx, product in enumerate(products):
+                    with cols[idx % 3]:
+                        render_shop_product_card(product, f"{category.lower()}_{idx}")
+
+            if not rendered_any:
+                st.info("No products found")
 
         # ── Recommendations panel ← RECOMMENDATION ENGINE ────────────────────
-        if st.session_state.recommendations:
+        if False and st.session_state.recommendations:
             st.divider()
             st.subheader("✨ You Might Also Like")
             rec_cols = st.columns(min(len(st.session_state.recommendations), 4))

@@ -1,240 +1,280 @@
-"""
-Recommendations router.
-
-GET /recommendations/{product_id}?limit=4&exclude_ids=2,7
-
-Returns up to `limit` products ranked by:
-  1. Cosine similarity of Voyage AI embeddings  (primary, requires VOYAGE_API_KEY)
-  2. Keyword / category / tag heuristic         (fallback when embeddings unavailable)
-"""
-
 from __future__ import annotations
 
 import json
+import os
+import re
+from collections import Counter
 from typing import Optional
 
+import requests
 from fastapi import APIRouter, HTTPException, Query
-from database import DB_connection
 
-try:
-    from embeddings import (
-        batch_load_embeddings,
-        cosine_similarity,
-        get_embedding,
-        get_embeddings_batch,
-        product_text,
-        upsert_embeddings_batch,
-        upsert_product_embedding,
-        VOYAGE_API_KEY,
-    )
-    EMBEDDINGS_ENABLED = bool(VOYAGE_API_KEY)
-except ImportError:
-    EMBEDDINGS_ENABLED = False
+from database import DB_connection
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 
+PRODUCT_GROUPS = {
+    "computer": {
+        "mouse", "keyboard", "hub", "webcam", "monitor", "laptop", "desk",
+        "office", "chair", "lamp", "arm", "table",
+    },
+    "audio": {"headphones", "speaker", "bluetooth", "noise", "canceling"},
+    "charging": {"charging", "charger", "usb", "hub", "phone", "plug"},
+    "fitness": {"fitness", "band", "bands", "yoga", "dumbbell", "foam", "roller", "resistance", "running"},
+    "kitchen": {"coffee", "mug", "cups", "knife", "skillet", "cutting", "board", "frother", "press"},
+    "travel": {"travel", "backpack", "passport", "umbrella", "pouch", "tote", "wallet", "sunglasses"},
+    "home": {"diffuser", "candle", "bonsai", "planter", "pillow", "towel", "soap", "led"},
+    "stationery": {"pen", "pens", "journal", "desk"},
+}
 
-# ── Fetch one product with all enrichment fields ──────────────────────────────
+COMPLEMENT_GROUPS = {
+    "computer": {"charging", "audio", "stationery"},
+    "audio": {"computer", "charging"},
+    "charging": {"computer", "audio", "travel"},
+    "fitness": {"travel"},
+    "kitchen": {"home"},
+    "travel": {"charging", "fitness"},
+    "home": {"kitchen"},
+    "stationery": {"computer"},
+}
+
+
+def _tokens(name: str) -> set[str]:
+    words = re.findall(r"[a-z0-9]+", (name or "").lower())
+    return {word for word in words if len(word) > 2}
+
+
+def _groups(product: dict) -> set[str]:
+    tokens = _tokens(product.get("name", ""))
+    return {
+        group
+        for group, keywords in PRODUCT_GROUPS.items()
+        if tokens & keywords
+    }
+
+
+def _format_product(product: dict) -> dict:
+    return {
+        "id": product["id"],
+        "name": product["name"],
+        "price": float(product["price"]),
+        "stock": product["stock"],
+        "image_url": product.get("image_url"),
+    }
+
+
 def _fetch_product(product_id: int) -> dict:
     conn = DB_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id, name, price, stock, image_url,
-                       category, sub_category, description, tags
-                FROM   products
-                WHERE  id = %s
-            """, (product_id,))
-            row = cur.fetchone()
-            if not row:
+            cur.execute(
+                """
+                SELECT id, name, price, stock, image_url
+                FROM products
+                WHERE id = %s
+                """,
+                (product_id,),
+            )
+            product = cur.fetchone()
+            if not product:
                 raise HTTPException(status_code=404, detail="Product not found")
-            return row
+            return product
     finally:
         conn.close()
 
 
-# ── Fetch all candidate products (excluding specified IDs) ────────────────────
-def _fetch_candidates(exclude_ids: list[int]) -> list[dict]:
+def _fetch_candidates(exclude_ids: set[int]) -> list[dict]:
+    if not exclude_ids:
+        exclude_ids = {-1}
+
     conn = DB_connection()
     try:
         with conn.cursor() as cur:
             placeholders = ",".join(["%s"] * len(exclude_ids))
-            cur.execute(f"""
-                SELECT id, name, price, stock, image_url,
-                       category, sub_category, description, tags
-                FROM   products
-                WHERE  id NOT IN ({placeholders})
-                  AND  stock > 0
-            """, tuple(exclude_ids))
+            cur.execute(
+                f"""
+                SELECT
+                    p.id,
+                    p.name,
+                    p.price,
+                    p.stock,
+                    p.image_url,
+                    COALESCE(SUM(oi.quantity), 0) AS sold_count
+                FROM products p
+                LEFT JOIN order_items oi ON oi.product_id = p.id
+                WHERE p.stock > 0
+                  AND p.id NOT IN ({placeholders})
+                GROUP BY p.id, p.name, p.price, p.stock, p.image_url
+                """,
+                tuple(exclude_ids),
+            )
             return cur.fetchall()
     finally:
         conn.close()
 
 
-# ── Strategy 1: Embedding-based cosine similarity ─────────────────────────────
-def _recommend_by_embeddings(
-    source: dict,
-    candidates: list[dict],
-    limit: int,
-) -> list[dict]:
-    """
-    Ranks candidates by cosine similarity to the source product embedding.
+def _co_purchase_counts(product_id: int, candidate_ids: set[int]) -> Counter[int]:
+    if not candidate_ids:
+        return Counter()
 
-    Optimised: loads ALL embeddings in a single DB round-trip, then generates
-    any missing ones in one batched Voyage AI call.
-    """
-    all_ids      = [source["id"]] + [c["id"] for c in candidates]
-    stored       = batch_load_embeddings(all_ids)   # single query
-
-    # Ensure source embedding exists
-    src_emb = stored.get(source["id"])
-    if src_emb is None:
-        src_emb = get_embedding(product_text(source))
-        upsert_product_embedding(source["id"], src_emb)
-
-    # Identify candidates that need embeddings generated
-    missing = [c for c in candidates if c["id"] not in stored]
-    if missing:
-        texts    = [product_text(c) for c in missing]
-        new_embs = get_embeddings_batch(texts)
-        pairs    = [(c["id"], emb) for c, emb in zip(missing, new_embs)]
-        upsert_embeddings_batch(pairs)
-        for c, emb in zip(missing, new_embs):
-            stored[c["id"]] = emb
-
-    # Score all candidates
-    scored: list[tuple[float, dict]] = []
-    for cand in candidates:
-        cand_emb = stored.get(cand["id"])
-        if cand_emb is None:
-            continue
-        score = cosine_similarity(src_emb, cand_emb)
-        scored.append((score, cand))
-
-    scored.sort(key=lambda t: t[0], reverse=True)
-    return [p for _, p in scored[:limit]]
+    conn = DB_connection()
+    try:
+        with conn.cursor() as cur:
+            placeholders = ",".join(["%s"] * len(candidate_ids))
+            cur.execute(
+                f"""
+                SELECT oi2.product_id, SUM(oi2.quantity) AS score
+                FROM order_items oi1
+                JOIN order_items oi2 ON oi2.order_id = oi1.order_id
+                WHERE oi1.product_id = %s
+                  AND oi2.product_id IN ({placeholders})
+                GROUP BY oi2.product_id
+                """,
+                (product_id, *candidate_ids),
+            )
+            return Counter(
+                {row["product_id"]: int(row["score"] or 0) for row in cur.fetchall()}
+            )
+    finally:
+        conn.close()
 
 
-# ── Strategy 2: Keyword / category heuristic (no API needed) ─────────────────
-def _recommend_by_keywords(
-    source: dict,
-    candidates: list[dict],
-    limit: int,
-) -> list[dict]:
-    """
-    Lightweight scoring using category, sub-category, tags, and name tokens.
-    Used when VOYAGE_API_KEY is not configured or the embedding API fails.
+def _rank_products_locally(source: dict, candidates: list[dict]) -> list[dict]:
+    source_tokens = _tokens(source["name"])
+    source_groups = _groups(source)
+    co_purchase_counts = _co_purchase_counts(
+        source["id"], {candidate["id"] for candidate in candidates}
+    )
 
-    Scoring weights:
-      +3.0  same category
-      +2.0  same sub-category
-      +1.0  per shared tag
-      +0.2  per shared name token
-    """
-    src_category = (source.get("category") or "").lower()
-    src_sub      = (source.get("sub_category") or "").lower()
+    ranked = []
+    for candidate in candidates:
+        candidate_tokens = _tokens(candidate["name"])
+        candidate_groups = _groups(candidate)
+        sold_count = int(candidate.get("sold_count") or 0)
+        stock = int(candidate.get("stock") or 0)
 
-    src_tags: set[str] = set()
-    raw_tags = source.get("tags")
-    if raw_tags:
-        if isinstance(raw_tags, str):
-            raw_tags = json.loads(raw_tags)
-        src_tags = {t.lower() for t in raw_tags}
-
-    src_tokens = set((source.get("name") or "").lower().split())
-
-    scored: list[tuple[float, dict]] = []
-    for cand in candidates:
         score = 0.0
+        score += co_purchase_counts[candidate["id"]] * 12.0
+        score += len(source_tokens & candidate_tokens) * 2.0
+        score += len(source_groups & candidate_groups) * 7.0
 
-        if src_category and (cand.get("category") or "").lower() == src_category:
-            score += 3.0
-        if src_sub and (cand.get("sub_category") or "").lower() == src_sub:
-            score += 2.0
+        complementary_groups = set()
+        for group in source_groups:
+            complementary_groups.update(COMPLEMENT_GROUPS.get(group, set()))
+        score += len(complementary_groups & candidate_groups) * 2.5
 
-        raw_cand_tags = cand.get("tags")
-        cand_tags: set[str] = set()
-        if raw_cand_tags:
-            if isinstance(raw_cand_tags, str):
-                raw_cand_tags = json.loads(raw_cand_tags)
-            cand_tags = {t.lower() for t in raw_cand_tags}
-        score += len(src_tags & cand_tags)
+        # Low-weight tie breakers only, so these do not make every product identical.
+        score += min(sold_count, 10) * 0.03
+        score += min(stock, 50) * 0.005
 
-        cand_tokens = set((cand.get("name") or "").lower().split())
-        score += 0.2 * len(src_tokens & cand_tokens)
+        ranked.append((score, candidate))
 
-        scored.append((score, cand))
-
-    scored.sort(key=lambda t: t[0], reverse=True)
-    return [p for _, p in scored[:limit]]
+    ranked.sort(key=lambda item: (item[0], item[1]["stock"], item[1]["name"]), reverse=True)
+    return [product for _, product in ranked]
 
 
-# ── Response serialiser ────────────────────────────────────────────────────────
-def _format_product(p: dict) -> dict:
-    return {
-        "id":           p["id"],
-        "name":         p["name"],
-        "price":        float(p["price"]),
-        "stock":        p["stock"],
-        "image_url":    p.get("image_url"),
-        "category":     p.get("category"),
-        "sub_category": p.get("sub_category"),
-    }
+def _groq_rank_products(source: dict, candidates: list[dict], limit: int) -> list[dict]:
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        return []
+
+    compact_candidates = [
+        {
+            "id": product["id"],
+            "name": product["name"],
+            "price": float(product["price"]),
+            "stock": product["stock"],
+        }
+        for product in candidates[:40]
+    ]
+
+    prompt = (
+        "Recommend products for a shopping cart based on the product the customer just added.\n"
+        "Pick items that are similar, useful accessories, or commonly complementary.\n"
+        "Return ONLY a JSON array of product ids, no markdown and no explanation.\n\n"
+        f"Just added product:\n{json.dumps(_format_product(source), default=str)}\n\n"
+        f"Candidate products:\n{json.dumps(compact_candidates, default=str)}\n\n"
+        f"Return exactly {limit} ids if possible."
+    )
+
+    response = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        json={
+            "model": "llama-3.3-70b-versatile",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an e-commerce recommendation engine. "
+                        "Use only the candidate product ids. Output valid JSON only."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.2,
+        },
+        timeout=20,
+    )
+    response.raise_for_status()
+    content = response.json()["choices"][0]["message"]["content"].strip()
+    ids = json.loads(re.sub(r"^```json|```$", "", content, flags=re.IGNORECASE).strip())
+    if not isinstance(ids, list):
+        return []
+
+    by_id = {product["id"]: product for product in candidates}
+    ranked = []
+    seen = set()
+    for raw_id in ids:
+        try:
+            product_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        if product_id in by_id and product_id not in seen:
+            ranked.append(by_id[product_id])
+            seen.add(product_id)
+        if len(ranked) >= limit:
+            break
+    return ranked
 
 
-# ── Main endpoint ──────────────────────────────────────────────────────────────
 @router.get("/{product_id}")
 def get_recommendations(
     product_id: int,
     limit: int = Query(default=4, ge=1, le=12),
     exclude_ids: Optional[str] = Query(
         default=None,
-        description="Comma-separated product IDs to exclude (e.g. cart items: '3,7,12')"
+        description="Comma-separated product IDs to exclude, such as cart items.",
     ),
 ):
-    """
-    Returns up to `limit` products similar to `product_id`.
-
-    Query params
-    ------------
-    limit        Number of results (1–12, default 4).
-    exclude_ids  Comma-separated IDs to skip (always excludes the source itself).
-
-    Response
-    --------
-    {
-        "strategy":        "embeddings" | "keywords" | "keywords_fallback" | "none",
-        "source_id":       5,
-        "recommendations": [ { id, name, price, stock, image_url, … } ]
-    }
-    """
-    # Build exclusion set — always skip the source product itself
-    exclude_set: set[int] = {product_id}
+    exclude_set = {product_id}
     if exclude_ids:
-        for raw in exclude_ids.split(","):
-            raw = raw.strip()
-            if raw.isdigit():
-                exclude_set.add(int(raw))
+        for raw_id in exclude_ids.split(","):
+            raw_id = raw_id.strip()
+            if raw_id.isdigit():
+                exclude_set.add(int(raw_id))
 
-    source     = _fetch_product(product_id)
-    candidates = _fetch_candidates(list(exclude_set))
-
+    source = _fetch_product(product_id)
+    candidates = _fetch_candidates(exclude_set)
     if not candidates:
         return {"strategy": "none", "source_id": product_id, "recommendations": []}
 
-    strategy = "keywords"
+    local_ranked = _rank_products_locally(source, candidates)
+    strategy = "database"
     try:
-        if EMBEDDINGS_ENABLED:
-            results  = _recommend_by_embeddings(source, candidates, limit)
-            strategy = "embeddings"
+        recommendations = _groq_rank_products(source, local_ranked, limit)
+        if recommendations:
+            strategy = "groq_ai"
         else:
-            results  = _recommend_by_keywords(source, candidates, limit)
+            recommendations = local_ranked[:limit]
     except Exception:
-        results  = _recommend_by_keywords(source, candidates, limit)
-        strategy = "keywords_fallback"
+        recommendations = local_ranked[:limit]
 
     return {
-        "strategy":        strategy,
-        "source_id":       product_id,
-        "recommendations": [_format_product(r) for r in results],
+        "strategy": strategy,
+        "source_id": product_id,
+        "recommendations": [_format_product(product) for product in recommendations],
     }

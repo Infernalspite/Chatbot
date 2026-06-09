@@ -11,6 +11,13 @@ class Product(BaseModel):
     price: float
     stock: int
     image_url: Optional[str] = None
+    description: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+class ProductFilterRequest(BaseModel):
+    query: Optional[str] = None
+    category: Optional[str] = None
+    sort_by: Optional[str] = "ai"
 
 class ItemData(BaseModel):
     id: int

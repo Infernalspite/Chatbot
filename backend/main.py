@@ -1,16 +1,20 @@
-from fastapi import FastAPI, HTTPException, Path, Query, Depends, Header, File, UploadFile
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Path, Query, Depends, Header, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from schema import User, Product, Order, OrderItem, ItemData, RoleUpdate, LoginRequest
+from schema import User, Product, ProductFilterRequest, Order, OrderItem, ItemData, RoleUpdate, LoginRequest
 from typing import List, Optional
 import pymysql
 import pymysql.cursors
 import os
+import json
+import re
 import shutil
 import uuid
 from dotenv import load_dotenv
+from pathlib import Path as FilePath
 
 # Load env variables (such as GROQ_API_KEY) from .env file
 load_dotenv()
+load_dotenv(FilePath(__file__).with_name(".env.txt"))
 
 from database import DB_connection, DB_TYPE
 from auth import hash_password, verify_password, create_access_token
@@ -18,6 +22,12 @@ import rbac
 import mange
 import chatbot
 import recommendations  # ← RECOMMENDATION ENGINE
+from product_classifier import (
+    CATEGORIES,
+    classify_and_update_product,
+    ensure_product_ai_columns,
+    process_uncategorized_products,
+)
 
 app = FastAPI()
 app.add_middleware(
@@ -32,6 +42,12 @@ from fastapi.staticfiles import StaticFiles
 # Ensure static uploads directory exists
 os.makedirs("static/images", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.on_event("startup")
+def prepare_product_ai_fields():
+    ensure_product_ai_columns()
+    process_uncategorized_products()
 
 
 # Include the refactored routers
@@ -116,11 +132,17 @@ def create_user(user: User):
 
 @app.post("/users/login")
 def login(credentials: LoginRequest):
+    connection = None
     try:
         connection = DB_connection()
         with connection.cursor() as cursor:
-            sql = "SELECT id, name, email, role, password FROM users WHERE name = %s"
-            cursor.execute(sql, (credentials.username,))
+            username = credentials.username.strip()
+            sql = """
+                SELECT id, name, email, role, password
+                FROM users
+                WHERE TRIM(name) = %s OR email = %s
+            """
+            cursor.execute(sql, (username, username))
             user = cursor.fetchone()
             
             if not user:
@@ -153,7 +175,8 @@ def login(credentials: LoginRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if connection:
+            connection.close()
 
 
 @app.get("/products")
@@ -161,7 +184,7 @@ def get_products():
     try:
         connection = DB_connection()
         with connection.cursor() as cursor:
-            sql = "SELECT id, name, price, stock, image_url FROM products"
+            sql = "SELECT id, name, price, stock, image_url, ai_category, ai_categories, ai_processed FROM products"
             cursor.execute(sql)
             result = cursor.fetchall()
             return result
@@ -169,6 +192,266 @@ def get_products():
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         connection.close()
+
+
+@app.post("/api/products")
+def create_product_api(product: Product, background_tasks: BackgroundTasks):
+    connection = None
+    try:
+        connection = DB_connection()
+        with connection.cursor() as cursor:
+            if DB_TYPE == "mysql":
+                cursor.execute(
+                    "INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s)",
+                    (product.name, product.price, product.stock, product.image_url),
+                )
+                product_id = cursor.lastrowid
+            else:
+                cursor.execute(
+                    "INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s) RETURNING id",
+                    (product.name, product.price, product.stock, product.image_url),
+                )
+                product_id = cursor.fetchone()["id"]
+            connection.commit()
+        background_tasks.add_task(classify_and_update_product, product_id)
+        return {"message": "Product created successfully", "product_id": product_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if connection:
+            connection.close()
+
+
+@app.get("/api/products/categorized")
+def get_categorized_products():
+    try:
+        connection = DB_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, name, price, stock, image_url, ai_category, ai_categories, ai_processed
+                FROM products
+                ORDER BY ai_category, name
+                """
+            )
+            products = cursor.fetchall()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        connection.close()
+
+    grouped = {category: [] for category in CATEGORIES}
+    for product in products:
+        raw_categories = product.get("ai_categories")
+        categories = []
+        if raw_categories:
+            if isinstance(raw_categories, str):
+                try:
+                    categories = json.loads(raw_categories)
+                except json.JSONDecodeError:
+                    categories = []
+            elif isinstance(raw_categories, list):
+                categories = raw_categories
+
+        if not categories:
+            categories = [product.get("ai_category") or "Other"]
+
+        valid_categories = [
+            category for category in categories if category in grouped
+        ] or ["Other"]
+
+        product["ai_categories"] = valid_categories
+        for category in valid_categories:
+            grouped[category].append(product)
+    return grouped
+
+
+def _product_categories(product: dict) -> list[str]:
+    raw_categories = product.get("ai_categories")
+    categories = []
+    if raw_categories:
+        if isinstance(raw_categories, str):
+            try:
+                categories = json.loads(raw_categories)
+            except json.JSONDecodeError:
+                categories = []
+        elif isinstance(raw_categories, list):
+            categories = raw_categories
+    if not categories:
+        categories = [product.get("ai_category") or "Other"]
+    return [category for category in categories if category in CATEGORIES] or ["Other"]
+
+
+def _group_products(products: list[dict], allowed_categories: list[str] | None = None) -> dict:
+    visible_categories = allowed_categories or CATEGORIES
+    grouped = {category: [] for category in CATEGORIES}
+    seen_by_category = {category: set() for category in CATEGORIES}
+    for product in products:
+        categories = _product_categories(product)
+        product["ai_categories"] = categories
+        for category in categories:
+            if category not in visible_categories:
+                continue
+            if product["id"] not in seen_by_category[category]:
+                grouped[category].append(product)
+                seen_by_category[category].add(product["id"])
+    return grouped
+
+
+def _infer_filter_intent(filter_request: ProductFilterRequest) -> dict:
+    query = (filter_request.query or "").strip()
+    requested_category = filter_request.category if filter_request.category in CATEGORIES else None
+    requested_sort = filter_request.sort_by or "ai"
+    ignored_keywords = {
+        "cheap", "cheaper", "lowest", "low", "expensive", "highest", "high",
+        "under", "below", "above", "over", "products", "product", "items",
+        "item", "category", "categories", "sort", "show", "find",
+        *[category.lower() for category in CATEGORIES],
+    }
+    fallback = {
+        "categories": [requested_category] if requested_category else [],
+        "keywords": [
+            word for word in re.findall(r"[a-z0-9]+", query.lower())
+            if len(word) > 2 and word not in ignored_keywords and not word.isdigit()
+        ],
+        "min_price": None,
+        "max_price": None,
+        "in_stock_only": True,
+        "sort_by": requested_sort,
+    }
+
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key or not query:
+        return fallback
+
+    prompt = {
+        "query": query,
+        "selected_category": requested_category or "All",
+        "selected_sort": requested_sort,
+        "allowed_categories": CATEGORIES,
+        "allowed_sort_by": ["ai", "name_asc", "price_low", "price_high", "stock_high"],
+        "output_schema": {
+            "categories": ["zero or more allowed categories"],
+            "keywords": ["search words from the user's intent"],
+            "min_price": "number or null",
+            "max_price": "number or null",
+            "in_stock_only": "boolean",
+            "sort_by": "one allowed sort value",
+        },
+    }
+
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Convert shopping filter text into strict JSON. "
+                            "Use only allowed categories and sort values."
+                        ),
+                    },
+                    {"role": "user", "content": json.dumps(prompt, default=str)},
+                ],
+                "temperature": 0,
+                "response_format": {"type": "json_object"},
+            },
+            timeout=15,
+        )
+        response.raise_for_status()
+        intent = json.loads(response.json()["choices"][0]["message"]["content"])
+    except Exception:
+        return fallback
+
+    categories = [
+        category for category in intent.get("categories", [])
+        if category in CATEGORIES
+    ]
+    if requested_category and requested_category not in categories:
+        categories.insert(0, requested_category)
+
+    sort_by = intent.get("sort_by") if intent.get("sort_by") in {
+        "ai", "name_asc", "price_low", "price_high", "stock_high"
+    } else requested_sort
+
+    return {
+        "categories": categories,
+        "keywords": [
+            str(word).lower()
+            for word in intent.get("keywords", [])
+            if str(word).strip()
+            and str(word).lower() not in ignored_keywords
+            and not str(word).isdigit()
+        ],
+        "min_price": intent.get("min_price"),
+        "max_price": intent.get("max_price"),
+        "in_stock_only": bool(intent.get("in_stock_only", True)),
+        "sort_by": sort_by,
+    }
+
+
+@app.post("/api/products/filter")
+def filter_products(filter_request: ProductFilterRequest):
+    intent = _infer_filter_intent(filter_request)
+    try:
+        connection = DB_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, name, price, stock, image_url, ai_category, ai_categories, ai_processed
+                FROM products
+                """
+            )
+            products = cursor.fetchall()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        connection.close()
+
+    filtered = []
+    for product in products:
+        categories = _product_categories(product)
+        name = (product.get("name") or "").lower()
+        price = float(product.get("price") or 0)
+        stock = int(product.get("stock") or 0)
+
+        if intent["categories"] and not set(intent["categories"]) & set(categories):
+            continue
+        if intent["in_stock_only"] and stock <= 0:
+            continue
+        if intent["min_price"] is not None and price < float(intent["min_price"]):
+            continue
+        if intent["max_price"] is not None and price > float(intent["max_price"]):
+            continue
+        if intent["keywords"] and not all(word in name for word in intent["keywords"]):
+            continue
+
+        product["ai_categories"] = categories
+        filtered.append(product)
+
+    sort_by = intent["sort_by"]
+    if sort_by == "name_asc":
+        filtered.sort(key=lambda product: product["name"])
+    elif sort_by == "price_low":
+        filtered.sort(key=lambda product: float(product["price"]))
+    elif sort_by == "price_high":
+        filtered.sort(key=lambda product: float(product["price"]), reverse=True)
+    elif sort_by == "stock_high":
+        filtered.sort(key=lambda product: int(product["stock"] or 0), reverse=True)
+    else:
+        filtered.sort(key=lambda product: (product.get("ai_category") or "Other", product["name"]))
+
+    return {
+        "intent": intent,
+        "count": len(filtered),
+        "grouped": _group_products(filtered, intent["categories"] or None),
+    }
 
 
 @app.post("/products/upload-image")

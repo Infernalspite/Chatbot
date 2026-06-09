@@ -17,6 +17,10 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify raw password against bcrypt hashed password"""
     try:
+        if not hashed_password:
+            return False
+        if not hashed_password.startswith("$2"):
+            return plain_password == hashed_password
         pwd_bytes = plain_password.encode('utf-8')
         hashed_bytes = hashed_password.encode('utf-8')
         return bcrypt.checkpw(pwd_bytes, hashed_bytes)

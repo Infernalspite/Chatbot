@@ -4,8 +4,10 @@ import pymysql.cursors
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
+from pathlib import Path
 
 load_dotenv()
+load_dotenv(Path(__file__).with_name(".env.txt"))
 
 # Detect which database to use:
 #   - If DB_HOST / DB_USER / DB_PASS are set in .env  →  MySQL  (local / MySQL Workbench)

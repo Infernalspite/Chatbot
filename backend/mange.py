@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Path, Header, Depends
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Path, Header, Depends
 from typing import List, Optional
 from schema import Product, RoleUpdate
 from rbac import RoleChecker, get_current_user
 from database import DB_connection, DB_TYPE
+from product_classifier import classify_and_update_product
 
 router = APIRouter()
 
@@ -96,7 +97,11 @@ def delete_user(user_id: int = Path(...), current_user: dict = Depends(get_curre
 
 
 @router.post("/products")
-def create_product(product: Product, current_user: dict = Depends(get_current_user)):
+def create_product(
+    product: Product,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+):
     """Create product - Manager or Admin only. Uses JWT for authentication"""
     manager_user_id = current_user.get("id")
     try:
@@ -119,6 +124,7 @@ def create_product(product: Product, current_user: dict = Depends(get_current_us
                                (product.name, product.price, product.stock, product.image_url))
                 product_id = cursor.fetchone()["id"]
             connection.commit()
+            background_tasks.add_task(classify_and_update_product, product_id)
             return {"message": "Product created successfully", "product_id": product_id}
     except HTTPException as he:
         raise he
@@ -129,7 +135,12 @@ def create_product(product: Product, current_user: dict = Depends(get_current_us
 
 
 @router.put("/products/{product_id}")
-def update_product(product_id: int = Path(...), product: Product = ..., current_user: dict = Depends(get_current_user)):
+def update_product(
+    product_id: int = Path(...),
+    product: Product = ...,
+    background_tasks: BackgroundTasks = None,
+    current_user: dict = Depends(get_current_user),
+):
     """Update product - Manager or Admin only. Uses JWT for authentication"""
     manager_user_id = current_user.get("id")
     try:
@@ -152,6 +163,8 @@ def update_product(product_id: int = Path(...), product: Product = ..., current_
             sql = "UPDATE products SET name = %s, price = %s, stock = %s, image_url = %s WHERE id = %s"
             cursor.execute(sql, (product.name, product.price, product.stock, product.image_url, product_id))
             connection.commit()
+            if background_tasks:
+                background_tasks.add_task(classify_and_update_product, product_id)
             return {"message": "Product updated successfully", "product_id": product_id}
     except HTTPException as he:
         raise he
