@@ -135,7 +135,7 @@ def render_shop_product_card(product: dict, key_prefix: str):
         if st.button(
             "Add to Cart",
             key=f"{key_prefix}_add_{product['id']}",
-            width='stretch',
+            use_container_width=True,
             disabled=product['stock'] <= 0,
         ):
             add_item_to_cart(product, qty)
@@ -197,7 +197,7 @@ def render_add_product(key_prefix: str):
             final_image_url = f"https://loremflickr.com/640/480/{search_term}"
             st.caption(f"✨ Suggested URL: `{final_image_url}`")
     
-    if st.button("➕ Add Product", width='stretch', type="primary", key=f"{key_prefix}_add_btn"):
+    if st.button("➕ Add Product", use_container_width=True, type="primary", key=f"{key_prefix}_add_btn"):
         if product_name and product_price >= 0 and product_stock >= 0:
             try:
                 payload = {
@@ -305,7 +305,7 @@ def render_manage_products(key_prefix: str):
                         col_update, col_delete = st.columns(2)
                         
                         with col_update:
-                            if st.button("💾 Update", key=f"{key_prefix}_update_{product['id']}", width='stretch'):
+                            if st.button("💾 Update", key=f"{key_prefix}_update_{product['id']}", use_container_width=True):
                                 try:
                                     headers = {}
                                     if st.session_state.token:
@@ -329,7 +329,7 @@ def render_manage_products(key_prefix: str):
                                     st.error(f"❌ Error: {str(e)}")
                         
                         with col_delete:
-                            if st.button("🗑️ Delete", key=f"{key_prefix}_delete_{product['id']}", width='stretch'):
+                            if st.button("🗑️ Delete", key=f"{key_prefix}_delete_{product['id']}", use_container_width=True):
                                 try:
                                     headers = {}
                                     if st.session_state.token:
@@ -483,7 +483,7 @@ def home_page():
         st.title("🛍️ Shopping Store")
     
     with col3:
-        if st.button("🚪 Logout", width='stretch'):
+        if st.button("🚪 Logout", use_container_width=True):
             st.session_state.user_id = None
             st.session_state.username = None
             st.session_state.user_role = None
@@ -680,7 +680,7 @@ def home_page():
                     with col3:
                         st.markdown(f"**${item_total:.2f}**")
                     with col4:
-                        if st.button("🗑️", key=f"cart_del_{item['product_id']}_{idx}", width='stretch'):
+                        if st.button("🗑️", key=f"cart_del_{item['product_id']}_{idx}", use_container_width=True):
                             to_remove = idx
             
             if to_remove is not None:
@@ -695,14 +695,14 @@ def home_page():
                 st.markdown(f"### Total: ${total_price:.2f}")
             
             with col2:
-                if st.button("Clear Cart", width='stretch'):
+                if st.button("Clear Cart", use_container_width=True):
                     st.session_state.cart = []
                     st.rerun()
             
             st.divider()
             
             # Checkout
-            if st.button("✅ Checkout", width='stretch', type="primary"):
+            if st.button("✅ Checkout", use_container_width=True, type="primary"):
                 try:
                     order_payload = {
                         "user_id": st.session_state.user_id,
@@ -767,7 +767,7 @@ def home_page():
                                 })
                             
                             df = pd.DataFrame(order_data)
-                            st.dataframe(df, width='stretch', hide_index=True)
+                            st.dataframe(df, use_container_width=True, hide_index=True)
                             st.markdown(f"**Order Total:** ${total:.2f}")
                 else:
                     st.info("📦 No orders yet. Start shopping! 🛍️")
@@ -807,7 +807,7 @@ def home_page():
                                 })
                             
                             df = pd.DataFrame(user_data)
-                            st.dataframe(df, width='stretch', hide_index=True)
+                            st.dataframe(df, use_container_width=True, hide_index=True)
                             
                             st.divider()
                             
@@ -822,7 +822,7 @@ def home_page():
                                 new_role = st.selectbox("New Role", ["user", "manager", "admin"])
                             
                             with col3:
-                                if st.button("Update Role", width='stretch', type="primary"):
+                                if st.button("Update Role", use_container_width=True, type="primary"):
                                     try:
                                         headers = {}
                                         if st.session_state.token:
@@ -852,7 +852,7 @@ def home_page():
                             with col2_del:
                                 # Add spacing to align button vertically with input
                                 st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                                if st.button("🗑️ Delete User", width='stretch', type="primary", key="delete_user_btn"):
+                                if st.button("🗑️ Delete User", use_container_width=True, type="primary", key="delete_user_btn"):
                                     if user_id_to_delete == st.session_state.user_id:
                                         st.error("❌ You cannot delete your own admin account.")
                                     else:
@@ -912,7 +912,7 @@ def home_page():
                             
                             if all_orders:
                                 df = pd.DataFrame(all_orders)
-                                st.dataframe(df, width='stretch', hide_index=True)
+                                st.dataframe(df, use_container_width=True, hide_index=True)
                                 st.markdown(f"**Total Orders:** {len(all_orders)}")
                             else:
                                 st.info("No orders found")
@@ -975,7 +975,7 @@ def home_page():
                                 })
                             
                             df = pd.DataFrame(user_data)
-                            st.dataframe(df, width='stretch', hide_index=True)
+                            st.dataframe(df, use_container_width=True, hide_index=True)
                         else:
                             st.info("No users or managers found")
                     else:
@@ -1345,3 +1345,4 @@ else:
         height=0,
         width=0
     )
+
