@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: shopsite-chatbot
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash scripts/render_start.sh
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: API_URL
+        value: http://127.0.0.1:8000
+      - key: GROQ_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: shopsite-chatbot-db
+          property: connectionString
+
+databases:
+  - name: shopsite-chatbot-db
+    plan: free
+    databaseName: shopsite
+    user: shopsite

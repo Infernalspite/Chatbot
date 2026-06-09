@@ -124,15 +124,26 @@ def process_uncategorized_products(limit: int = 100):
     conn = DB_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT id
-                FROM products
-                WHERE ai_categories IS NULL OR ai_categories = ''
-                LIMIT %s
-                """,
-                (limit,),
-            )
+            if DB_TYPE == "mysql":
+                cur.execute(
+                    """
+                    SELECT id
+                    FROM products
+                    WHERE ai_categories IS NULL OR ai_categories = ''
+                    LIMIT %s
+                    """,
+                    (limit,),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT id
+                    FROM products
+                    WHERE ai_categories IS NULL
+                    LIMIT %s
+                    """,
+                    (limit,),
+                )
             product_ids = [row["id"] for row in cur.fetchall()]
     finally:
         conn.close()

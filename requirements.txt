@@ -1,5 +1,5 @@
 fastapi
-streamlit
+streamlit==1.41.1
 requests
 pandas
 pymysql
