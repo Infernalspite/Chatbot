@@ -27,6 +27,77 @@ if "recommendations" not in st.session_state:       # ← RECOMMENDATION ENGINE
 
 if "recommendation_source_id" not in st.session_state:
     st.session_state.recommendation_source_id = None
+if "cart_ai_summary" not in st.session_state:
+    st.session_state.cart_ai_summary = None
+if "cart_ai_signature" not in st.session_state:
+    st.session_state.cart_ai_signature = None
+
+
+def cart_signature() -> tuple:
+    return tuple(
+        (item["product_id"], item["name"], float(item["price"]), int(item["quantity"]))
+        for item in st.session_state.cart
+    )
+
+
+def cart_totals() -> tuple[int, float]:
+    total_items = sum(int(item["quantity"]) for item in st.session_state.cart)
+    total_price = sum(float(item["price"]) * int(item["quantity"]) for item in st.session_state.cart)
+    return total_items, total_price
+
+
+def fallback_cart_summary() -> dict:
+    total_items, total_price = cart_totals()
+    if total_items == 0:
+        reply = "Your cart is empty. There are 0 items present."
+    else:
+        item_word = "item" if total_items == 1 else "items"
+        products = ", ".join(
+            f"{int(item['quantity'])} x {item['name']}"
+            for item in st.session_state.cart
+        )
+        reply = f"Your cart has {total_items} {item_word}: {products}."
+    return {
+        "reply": reply,
+        "item_count": total_items,
+        "unique_count": len(st.session_state.cart),
+        "total_price": round(total_price, 2),
+        "error": True,
+    }
+
+
+def fetch_cart_ai_summary(force: bool = False):
+    signature = cart_signature()
+    if not force and st.session_state.cart_ai_signature == signature:
+        return
+
+    st.session_state.cart_ai_signature = signature
+    if not st.session_state.cart:
+        st.session_state.cart_ai_summary = fallback_cart_summary()
+        return
+
+    try:
+        response = requests.post(
+            f"{API_URL}/cart/summary",
+            json={
+                "items": [
+                    {
+                        "product_id": item["product_id"],
+                        "name": item["name"],
+                        "price": float(item["price"]),
+                        "quantity": int(item["quantity"]),
+                    }
+                    for item in st.session_state.cart
+                ]
+            },
+            timeout=20,
+        )
+        if response.status_code == 200:
+            st.session_state.cart_ai_summary = response.json()
+        else:
+            st.session_state.cart_ai_summary = fallback_cart_summary()
+    except Exception:
+        st.session_state.cart_ai_summary = fallback_cart_summary()
 
 
 def fetch_recommendations(product_id: int, limit: int = 4):
@@ -642,6 +713,14 @@ def home_page():
         st.subheader("Shopping Cart")
         
         if st.session_state.cart:
+            fetch_cart_ai_summary()
+            summary = st.session_state.cart_ai_summary or fallback_cart_summary()
+            st.info(summary.get("reply", fallback_cart_summary()["reply"]))
+            st.caption(
+                f"AI cart count: {summary.get('item_count', 0)} total items "
+                f"across {summary.get('unique_count', 0)} product types."
+            )
+
             total_price = 0
             
             # Column headers for visual layout

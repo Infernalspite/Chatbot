@@ -43,6 +43,25 @@ class ChatResponse(BaseModel):
     error: Optional[bool] = None
 
 
+class CartItem(BaseModel):
+    product_id: int
+    name: str = Field(..., max_length=120)
+    price: float = Field(..., ge=0)
+    quantity: int = Field(..., ge=1)
+
+
+class CartSummaryRequest(BaseModel):
+    items: List[CartItem] = Field(default_factory=list, max_length=50)
+
+
+class CartSummaryResponse(BaseModel):
+    reply: str
+    item_count: int
+    unique_count: int
+    total_price: float
+    error: Optional[bool] = None
+
+
 def get_api_key() -> str:
     key = os.getenv("GROQ_API_KEY")
     if not key:
@@ -136,6 +155,91 @@ def ask_ai(input_messages: list) -> str:
         raise Exception("Groq returned an empty response")
 
     return str(content).strip()
+
+
+def build_cart_summary_fallback(items: List[CartItem]) -> str:
+    item_count = sum(item.quantity for item in items)
+    if item_count == 0:
+        return "Your cart is empty. There are 0 items present."
+
+    product_lines = ", ".join(f"{item.quantity} x {item.name}" for item in items)
+    item_word = "item" if item_count == 1 else "items"
+    return f"Your cart has {item_count} {item_word}: {product_lines}."
+
+
+@router.post("/cart/summary", response_model=CartSummaryResponse)
+def summarize_cart(body: CartSummaryRequest):
+    items = body.items or []
+    item_count = sum(item.quantity for item in items)
+    unique_count = len(items)
+    total_price = round(sum(item.price * item.quantity for item in items), 2)
+
+    if not items:
+        return CartSummaryResponse(
+            reply="Your cart is empty. There are 0 items present.",
+            item_count=0,
+            unique_count=0,
+            total_price=0,
+        )
+
+    cart_data = [
+        {
+            "name": item.name,
+            "quantity": item.quantity,
+            "unit_price": item.price,
+            "line_total": round(item.price * item.quantity, 2),
+        }
+        for item in items
+    ]
+
+    try:
+        reply = filter_response_output(
+            ask_ai(
+                [
+                    {
+                        "role": "system",
+                        "content": (
+                            SECURITY_RULES
+                            + "You are a shopping cart assistant. "
+                            "Use only the cart JSON provided by the app. "
+                            "Briefly say exactly how many total items are present, "
+                            "mention the product names and quantities, and include the cart total. "
+                            "Do not recommend products, mention databases, or invent missing items."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": wrap_user_message(
+                            "Summarize this cart for the customer:\n"
+                            + json.dumps(
+                                {
+                                    "total_item_count": item_count,
+                                    "unique_product_count": unique_count,
+                                    "cart_total": total_price,
+                                    "items": cart_data,
+                                },
+                                default=str,
+                            )
+                        ),
+                    },
+                ]
+            )
+        )
+        return CartSummaryResponse(
+            reply=reply,
+            item_count=item_count,
+            unique_count=unique_count,
+            total_price=total_price,
+        )
+    except Exception as err:
+        print(f"Cart summary error: {err}")
+        return CartSummaryResponse(
+            reply=build_cart_summary_fallback(items),
+            item_count=item_count,
+            unique_count=unique_count,
+            total_price=total_price,
+            error=True,
+        )
 
 
 @router.post("/chat", response_model=ChatResponse)
