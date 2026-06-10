@@ -820,34 +820,39 @@ def home_page():
                     # Group by order_id
                     orders_dict = {}
                     for item in orders:
-                        order_id = item['order_id']
+                        order_id = item.get('order_id')
+                        if order_id is None:
+                            continue
                         if order_id not in orders_dict:
                             orders_dict[order_id] = []
                         orders_dict[order_id].append(item)
                     
-                    for order_id, items in orders_dict.items():
-                        with st.container(border=True):
-                            col1, col2 = st.columns([3, 1])
-                            with col1:
-                                st.markdown(f"### Order #{order_id}")
-                            with col2:
-                                st.markdown(f"**Items:** {len(items)}")
-                            
-                            order_data = []
-                            total = 0
-                            for item in items:
-                                item_total = item['price'] * item['quantity']
-                                total += item_total
-                                order_data.append({
-                                    "Product": item['product_name'],
-                                    "Price": f"${item['price']:.2f}",
-                                    "Quantity": item['quantity'],
-                                    "Total": f"${item_total:.2f}"
-                                })
-                            
-                            df = pd.DataFrame(order_data)
-                            st.dataframe(df, use_container_width=True, hide_index=True)
-                            st.markdown(f"**Order Total:** ${total:.2f}")
+                    if orders_dict:
+                        for order_id, items in orders_dict.items():
+                            with st.container(border=True):
+                                col1, col2 = st.columns([3, 1])
+                                with col1:
+                                    st.markdown(f"### Order #{order_id}")
+                                with col2:
+                                    st.markdown(f"**Items:** {len(items)}")
+                                
+                                order_data = []
+                                total = 0
+                                for item in items:
+                                    item_total = item['price'] * item['quantity']
+                                    total += item_total
+                                    order_data.append({
+                                        "Product": item['product_name'],
+                                        "Price": f"${item['price']:.2f}",
+                                        "Quantity": item['quantity'],
+                                        "Total": f"${item_total:.2f}"
+                                    })
+                                
+                                df = pd.DataFrame(order_data)
+                                st.dataframe(df, use_container_width=True, hide_index=True)
+                                st.markdown(f"**Order Total:** ${total:.2f}")
+                    else:
+                        st.info("ðŸ“¦ No orders yet. Start shopping! ðŸ›ï¸")
                 else:
                     st.info("📦 No orders yet. Start shopping! 🛍️")
             else:

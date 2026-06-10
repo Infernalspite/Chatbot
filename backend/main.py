@@ -102,9 +102,10 @@ def get_user(user_id: int = Path(...)):
             cursor.execute(sql, (user_id,))
             result = cursor.fetchall()
             
-            # If user has no orders, return just the user info
+            # If user has no orders, return an empty order list.
+            # The frontend order view expects every returned row to have order_id.
             if not result or all(item.get('order_id') is None for item in result):
-                return [user_info]
+                return []
             
             return result
     except Exception as e:
@@ -498,7 +499,7 @@ def create_order(payload: Order):
                 cursor.execute(sql_item, (order_id, item.product_id, item.quantity))
             
             connection.commit()
-            return {"message": "Order created successfully"}
+            return {"message": "Order created successfully", "order_id": order_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
