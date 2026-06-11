@@ -1087,85 +1087,272 @@ else:
 pg.run()
 
 
-# =============== SERVER-SIDE CHATBOT ===============
-if st.session_state.user_id is not None:
-    if "support_chat_history" not in st.session_state:
-        st.session_state.support_chat_history = [
-            {
-                "role": "assistant",
-                "content": "Hello! I'm your shopping assistant. Ask me about products, your orders, or what's in your cart.",
-            }
-        ]
-
-    with st.sidebar:
-        st.subheader("Shopping Assistant")
-
-        for msg in st.session_state.support_chat_history[-8:]:
-            if msg["role"] == "user":
-                st.markdown(f"**You:** {msg['content']}")
-            else:
-                st.markdown(f"**Assistant:** {msg['content']}")
-
-        with st.form("support_chat_form", clear_on_submit=True):
-            chat_prompt = st.text_input("Ask a question", placeholder="What is in my cart?")
-            chat_submitted = st.form_submit_button("Send", use_container_width=True)
-
-        if chat_submitted and chat_prompt.strip():
-            user_message = chat_prompt.strip()
-            st.session_state.support_chat_history.append({"role": "user", "content": user_message})
-            try:
-                response = requests.post(
-                    f"{API_URL}/chat",
-                    json={
-                        "message": user_message,
-                        "history": st.session_state.support_chat_history[-10:],
-                        "user_id": st.session_state.user_id,
-                        "cart_items": [
-                            {
-                                "product_id": item["product_id"],
-                                "name": item["name"],
-                                "price": float(item["price"]),
-                                "quantity": int(item["quantity"]),
-                            }
-                            for item in st.session_state.cart
-                        ],
-                    },
-                    timeout=60,
-                )
-                if response.status_code == 200:
-                    reply = response.json().get("reply", "Sorry, I could not answer that.")
-                else:
-                    reply = f"Sorry, I could not reach the support server. {response_detail(response)}"
-            except Exception as e:
-                reply = f"Sorry, I could not reach the support server. {str(e)}"
-
-            st.session_state.support_chat_history.append({"role": "assistant", "content": reply})
-            st.session_state.support_chat_history = st.session_state.support_chat_history[-10:]
-            st.rerun()
-
-
-# =============== REMOVE OLD FLOATING CHAT WIDGET ===============
+# =============== FLOATING CHAT WIDGET ===============
 import streamlit.components.v1 as components
 
-components.html(
-    """
-    <script>
-    (function() {
-        var parentDoc = window.parent.document;
-        var oldWidget = parentDoc.getElementById("floating-chat-widget");
-        if (oldWidget) {
-            oldWidget.remove();
+if st.session_state.user_id is not None:
+    chat_user_id = st.session_state.user_id
+    chat_cart_items = json.dumps([
+        {
+            "product_id": item["product_id"],
+            "name": item["name"],
+            "price": float(item["price"]),
+            "quantity": int(item["quantity"]),
         }
-        var oldStyle = parentDoc.getElementById("floating-chat-widget-style");
-        if (oldStyle) {
-            oldStyle.remove();
-        }
-        if (window.parent.chatWidgetState) {
-            window.parent.chatWidgetState = null;
-        }
-    })();
-    </script>
-    """,
-    height=0,
-    width=0,
-)
+        for item in st.session_state.cart
+    ])
+    components.html(
+        f"""
+        <script>
+        (function() {{
+            var parentDoc = window.parent.document;
+            var parentWin = window.parent;
+            var chatUserId = {chat_user_id};
+            var chatCartItems = {chat_cart_items};
+            var chatUrl = window.location.origin + "/chat";
+
+            if (!parentWin.chatWidgetState) {{
+                parentWin.chatWidgetState = {{
+                    isOpen: false,
+                    history: [],
+                    messagesHtml: '<div class="message bot">Hello! I\\'m your shopping assistant. How can I help you find products or orders today?</div>',
+                    inputText: ""
+                }};
+            }}
+
+            var oldWidget = parentDoc.getElementById("floating-chat-widget");
+            if (oldWidget) {{
+                var oldInput = parentDoc.getElementById("chat-message-input");
+                if (oldInput) {{
+                    parentWin.chatWidgetState.inputText = oldInput.value;
+                }}
+                oldWidget.remove();
+            }}
+
+            var oldStyle = parentDoc.getElementById("floating-chat-widget-style");
+            if (oldStyle) {{
+                oldStyle.remove();
+            }}
+
+            var style = parentDoc.createElement("style");
+            style.id = "floating-chat-widget-style";
+            style.innerHTML = `
+                .chat-btn {{
+                    position: fixed;
+                    bottom: 25px;
+                    right: 25px;
+                    width: 60px;
+                    height: 60px;
+                    border-radius: 50%;
+                    background: #667eea;
+                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 28px;
+                    cursor: pointer;
+                    z-index: 999999;
+                }}
+                .chat-window {{
+                    position: fixed;
+                    bottom: 95px;
+                    right: 25px;
+                    width: 370px;
+                    height: 500px;
+                    border-radius: 8px;
+                    background: white;
+                    border: 1px solid rgba(0,0,0,0.15);
+                    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+                    display: flex;
+                    flex-direction: column;
+                    z-index: 999999;
+                    overflow: hidden;
+                    font-family: Arial, sans-serif;
+                }}
+                .chat-header {{
+                    background: #667eea;
+                    color: white;
+                    padding: 14px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    font-weight: bold;
+                }}
+                .chat-close-btn {{
+                    cursor: pointer;
+                    font-size: 20px;
+                }}
+                .chat-messages {{
+                    flex-grow: 1;
+                    padding: 14px;
+                    overflow-y: auto;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                    background: #f7f7fb;
+                }}
+                .message {{
+                    max-width: 82%;
+                    padding: 10px 12px;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    line-height: 1.4;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                }}
+                .message.user {{
+                    align-self: flex-end;
+                    background: #667eea;
+                    color: white;
+                }}
+                .message.bot {{
+                    align-self: flex-start;
+                    background: white;
+                    color: #222;
+                    border: 1px solid #e5e5e5;
+                }}
+                .chat-input-area {{
+                    padding: 12px;
+                    border-top: 1px solid #eee;
+                    display: flex;
+                    gap: 8px;
+                }}
+                .chat-input {{
+                    flex-grow: 1;
+                    border: 1px solid #ccc;
+                    border-radius: 8px;
+                    padding: 8px 10px;
+                    font-size: 14px;
+                    outline: none;
+                }}
+                .send-btn {{
+                    background: #667eea;
+                    border: none;
+                    color: white;
+                    border-radius: 8px;
+                    width: 42px;
+                    cursor: pointer;
+                }}
+            `;
+            parentDoc.head.appendChild(style);
+
+            var widgetContainer = parentDoc.createElement("div");
+            widgetContainer.id = "floating-chat-widget";
+            widgetContainer.innerHTML = `
+                <div class="chat-btn" id="chat-toggle-btn">💬</div>
+                <div class="chat-window" id="chat-widget-window">
+                    <div class="chat-header">
+                        <div>Shopping Assistant</div>
+                        <div class="chat-close-btn" id="chat-close-btn">&times;</div>
+                    </div>
+                    <div class="chat-messages" id="chat-messages-container"></div>
+                    <div class="chat-input-area">
+                        <input type="text" class="chat-input" id="chat-message-input" placeholder="Type a message..." autocomplete="off">
+                        <button class="send-btn" id="chat-send-btn">&#10148;</button>
+                    </div>
+                </div>
+            `;
+            parentDoc.body.appendChild(widgetContainer);
+
+            var btn = parentDoc.getElementById("chat-toggle-btn");
+            var windowEl = parentDoc.getElementById("chat-widget-window");
+            var closeBtn = parentDoc.getElementById("chat-close-btn");
+            var messagesContainer = parentDoc.getElementById("chat-messages-container");
+            var inputEl = parentDoc.getElementById("chat-message-input");
+            var sendBtn = parentDoc.getElementById("chat-send-btn");
+
+            windowEl.style.display = parentWin.chatWidgetState.isOpen ? "flex" : "none";
+            messagesContainer.innerHTML = parentWin.chatWidgetState.messagesHtml;
+            inputEl.value = parentWin.chatWidgetState.inputText;
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            btn.onclick = function() {{
+                if (windowEl.style.display === "none" || windowEl.style.display === "") {{
+                    windowEl.style.display = "flex";
+                    parentWin.chatWidgetState.isOpen = true;
+                    inputEl.focus();
+                }} else {{
+                    windowEl.style.display = "none";
+                    parentWin.chatWidgetState.isOpen = false;
+                }}
+            }};
+
+            closeBtn.onclick = function() {{
+                windowEl.style.display = "none";
+                parentWin.chatWidgetState.isOpen = false;
+            }};
+
+            function sendMessage() {{
+                var text = inputEl.value.trim();
+                if (!text) return;
+
+                appendMessage("user", text);
+                inputEl.value = "";
+                parentWin.chatWidgetState.inputText = "";
+
+                fetch(chatUrl, {{
+                    method: "POST",
+                    headers: {{"Content-Type": "application/json"}},
+                    body: JSON.stringify({{
+                        message: text,
+                        history: parentWin.chatWidgetState.history,
+                        user_id: chatUserId,
+                        cart_items: chatCartItems
+                    }})
+                }})
+                .then(function(res) {{
+                    return res.json();
+                }})
+                .then(function(data) {{
+                    var reply = data && data.reply ? data.reply : "Sorry, I encountered an issue processing your request.";
+                    appendMessage("bot", reply);
+                    parentWin.chatWidgetState.history.push({{role: "user", content: text}});
+                    parentWin.chatWidgetState.history.push({{role: "assistant", content: reply}});
+                    parentWin.chatWidgetState.history = parentWin.chatWidgetState.history.slice(-10);
+                }})
+                .catch(function(err) {{
+                    appendMessage("bot", "Could not reach the support server. Please try again later.");
+                    console.error(err);
+                }});
+            }}
+
+            sendBtn.onclick = sendMessage;
+            inputEl.onkeypress = function(e) {{
+                if (e.key === "Enter") sendMessage();
+            }};
+            inputEl.oninput = function() {{
+                parentWin.chatWidgetState.inputText = inputEl.value;
+            }};
+
+            function appendMessage(sender, text) {{
+                var msg = parentDoc.createElement("div");
+                msg.className = "message " + sender;
+                msg.innerText = text;
+                messagesContainer.appendChild(msg);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                parentWin.chatWidgetState.messagesHtml = messagesContainer.innerHTML;
+            }}
+        }})();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+else:
+    components.html(
+        """
+        <script>
+        (function() {
+            var parentDoc = window.parent.document;
+            var oldWidget = parentDoc.getElementById("floating-chat-widget");
+            if (oldWidget) oldWidget.remove();
+            var oldStyle = parentDoc.getElementById("floating-chat-widget-style");
+            if (oldStyle) oldStyle.remove();
+            if (window.parent.chatWidgetState) window.parent.chatWidgetState = null;
+        })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
