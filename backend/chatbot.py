@@ -33,21 +33,23 @@ class Message(BaseModel):
     content: str = Field(..., max_length=MAX_MESSAGE_LENGTH)
 
 
-class ChatRequest(BaseModel):
-    message: str = Field(..., max_length=MAX_MESSAGE_LENGTH)
-    history: Optional[List[Message]] = Field(default_factory=list, max_length=10)
-
-
-class ChatResponse(BaseModel):
-    reply: str
-    error: Optional[bool] = None
-
-
 class CartItem(BaseModel):
     product_id: int
     name: str = Field(..., max_length=120)
     price: float = Field(..., ge=0)
     quantity: int = Field(..., ge=1)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., max_length=MAX_MESSAGE_LENGTH)
+    history: Optional[List[Message]] = Field(default_factory=list, max_length=10)
+    user_id: Optional[int] = None
+    cart_items: List[CartItem] = Field(default_factory=list, max_length=50)
+
+
+class ChatResponse(BaseModel):
+    reply: str
+    error: Optional[bool] = None
 
 
 class CartSummaryRequest(BaseModel):
@@ -86,19 +88,99 @@ def run_select_query(sql: str) -> str:
             connection.close()
 
 
-def build_reply_system_prompt(db_context: str) -> str:
+def fetch_user_orders(user_id: Optional[int]) -> str:
+    if not user_id:
+        return "ORDER_CONTEXT: The customer is not logged in, so saved orders cannot be loaded."
+
+    try:
+        connection = DB_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    o.id AS order_id,
+                    o.created_at,
+                    p.id AS product_id,
+                    p.name AS product_name,
+                    p.price,
+                    oi.quantity
+                FROM orders o
+                JOIN order_items oi ON oi.order_id = o.id
+                JOIN products p ON p.id = oi.product_id
+                WHERE o.user_id = %s
+                ORDER BY o.id DESC, oi.id ASC
+                LIMIT 50
+                """,
+                (user_id,),
+            )
+            rows = cursor.fetchall()
+            if not rows:
+                return "ORDER_CONTEXT: This customer has no saved orders yet."
+            return f"ORDER_CONTEXT:\n{json.dumps(rows, indent=2, default=str)}"
+    except Exception as e:
+        return f"ORDER_CONTEXT_ERROR: {str(e)}"
+    finally:
+        if "connection" in locals() and connection:
+            connection.close()
+
+
+def build_cart_context(items: List[CartItem]) -> str:
+    if not items:
+        return "CART_CONTEXT: The customer's current cart is empty."
+
+    total_items = sum(item.quantity for item in items)
+    total_price = round(sum(item.price * item.quantity for item in items), 2)
+    cart_rows = [
+        {
+            "product_id": item.product_id,
+            "name": item.name,
+            "quantity": item.quantity,
+            "unit_price": item.price,
+            "line_total": round(item.price * item.quantity, 2),
+        }
+        for item in items
+    ]
+    return (
+        "CART_CONTEXT:\n"
+        + json.dumps(
+            {
+                "total_item_count": total_items,
+                "unique_product_count": len(items),
+                "cart_total": total_price,
+                "items": cart_rows,
+            },
+            indent=2,
+            default=str,
+        )
+    )
+
+
+def is_cart_question(message: str) -> bool:
+    return bool(re.search(r"\b(cart|basket|bag|checkout|current items?|items? in my cart)\b", message, re.I))
+
+
+def is_order_question(message: str) -> bool:
+    return bool(re.search(r"\b(order|orders|ordered|purchase|purchases|bought|receipt)\b", message, re.I))
+
+
+def build_reply_system_prompt(db_context: str, cart_context: str = "", order_context: str = "") -> str:
     base = (
         SECURITY_RULES
         + "You are a friendly e-commerce customer support assistant.\n"
         "Answer the customer's question warmly and concisely in 2-3 sentences.\n"
+        "Use the provided cart context for current cart questions and order context for saved order questions.\n"
+        "The cart is not the same as saved orders: cart items are not ordered yet.\n"
         "Never mention SQL, databases, queries, or technical details. Speak naturally.\n\n"
     )
-    if not db_context:
+    context_parts = [part for part in (cart_context, order_context, db_context) if part]
+    if not context_parts:
         return base + "Answer from general store knowledge, such as returns, shipping, or policies."
 
     if db_context.startswith("INVENTORY_EMPTY"):
         return (
             base
+            + wrap_catalog_context("\n\n".join(part for part in (cart_context, order_context) if part))
+            + "\n"
             + "The catalog has no products matching what they asked for. "
             "Tell them clearly we do not carry that item right now and offer one brief alternative.\n"
         )
@@ -106,11 +188,13 @@ def build_reply_system_prompt(db_context: str) -> str:
     if db_context.startswith("INVENTORY_ERROR"):
         return (
             base
+            + wrap_catalog_context("\n\n".join(part for part in (cart_context, order_context) if part))
+            + "\n"
             + "Inventory lookup failed. Apologize once and ask them to try again shortly. "
             "Do not invent stock or product details.\n"
         )
 
-    return base + wrap_catalog_context(db_context)
+    return base + wrap_catalog_context("\n\n".join(context_parts))
 
 
 def ask_ai(input_messages: list) -> str:
@@ -246,6 +330,8 @@ def summarize_cart(body: CartSummaryRequest):
 def chat(body: ChatRequest):
     message = sanitize_message(body.message)
     history = validate_history(body.history or [])
+    cart_context = build_cart_context(body.cart_items)
+    order_context = fetch_user_orders(body.user_id) if is_order_question(message) else ""
 
     if not message:
         raise HTTPException(status_code=400, detail="No message provided")
@@ -257,6 +343,22 @@ def chat(body: ChatRequest):
         return ChatResponse(reply=OFF_TOPIC_REPLY)
 
     try:
+        if is_cart_question(message) or is_order_question(message):
+            reply_messages = [
+                {
+                    "role": "system",
+                    "content": build_reply_system_prompt(
+                        "",
+                        cart_context if is_cart_question(message) or body.cart_items else "",
+                        order_context,
+                    ),
+                }
+            ]
+            reply_messages.extend(history)
+            reply_messages.append({"role": "user", "content": wrap_user_message(message)})
+            reply = filter_response_output(ask_ai(reply_messages))
+            return ChatResponse(reply=reply)
+
         router_messages = [
             {
                 "role": "system",

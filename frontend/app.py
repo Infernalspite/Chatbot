@@ -1,5 +1,6 @@
 # pyrefly: ignore [missing-import]
 import streamlit as st
+import json
 import os
 import requests
 import pandas as pd
@@ -1090,12 +1091,24 @@ pg.run()
 import streamlit.components.v1 as components
 
 if st.session_state.user_id is not None:
+    chat_user_id = st.session_state.user_id
+    chat_cart_items = json.dumps([
+        {
+            "product_id": item["product_id"],
+            "name": item["name"],
+            "price": float(item["price"]),
+            "quantity": int(item["quantity"]),
+        }
+        for item in st.session_state.cart
+    ])
     components.html(
         f"""
         <script>
         (function() {{
             var parentDoc = window.parent.document;
             var parentWin = window.parent;
+            var chatUserId = {chat_user_id};
+            var chatCartItems = {chat_cart_items};
             
             // 1. Initialize state in the parent window if it doesn't exist
             if (!parentWin.chatWidgetState) {{
@@ -1345,7 +1358,9 @@ if st.session_state.user_id is not None:
                     }},
                     body: JSON.stringify({{
                         message: text,
-                        history: parentWin.chatWidgetState.history
+                        history: parentWin.chatWidgetState.history,
+                        user_id: chatUserId,
+                        cart_items: chatCartItems
                     }})
                 }})
                 .then(function(res) {{
