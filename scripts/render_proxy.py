@@ -59,6 +59,11 @@ async def proxy_http(request: web.Request) -> web.StreamResponse:
 async def proxy_websocket(request: web.Request) -> web.WebSocketResponse:
     upstream = upstream_for(request.path)
     target = f"{upstream.replace('http', 'ws', 1)}{request.rel_url}"
+    requested_protocols = [
+        protocol.strip()
+        for protocol in request.headers.get("sec-websocket-protocol", "").split(",")
+        if protocol.strip()
+    ]
     headers = {
         key: value
         for key, value in request.headers.items()
@@ -68,15 +73,27 @@ async def proxy_websocket(request: web.Request) -> web.WebSocketResponse:
             "connection",
             "upgrade",
             "sec-websocket-key",
+            "sec-websocket-protocol",
             "sec-websocket-version",
             "sec-websocket-extensions",
         }
     }
-    client_ws = web.WebSocketResponse()
-    await client_ws.prepare(request)
 
     async with ClientSession() as session:
-        async with session.ws_connect(target, headers=headers, max_msg_size=0) as upstream_ws:
+        async with session.ws_connect(
+            target,
+            headers=headers,
+            protocols=requested_protocols,
+            max_msg_size=0,
+        ) as upstream_ws:
+            selected_protocol = upstream_ws.protocol
+            client_protocols = [selected_protocol] if selected_protocol else requested_protocols
+            client_ws = web.WebSocketResponse(
+                protocols=client_protocols,
+                max_msg_size=0,
+                compress=False,
+            )
+            await client_ws.prepare(request)
 
             async def browser_to_upstream():
                 try:
