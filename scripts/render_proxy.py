@@ -16,6 +16,7 @@ BACKEND_PREFIXES = (
     "/orders",
     "/products",
     "/recommendations/",
+    "/static/",
     "/users",
 )
 
