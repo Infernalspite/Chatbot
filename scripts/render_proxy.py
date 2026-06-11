@@ -59,58 +59,31 @@ async def proxy_http(request: web.Request) -> web.StreamResponse:
 async def proxy_websocket(request: web.Request) -> web.WebSocketResponse:
     upstream = upstream_for(request.path)
     target = f"{upstream.replace('http', 'ws', 1)}{request.rel_url}"
-    headers = {
-        key: value
-        for key, value in request.headers.items()
-        if key.lower()
-        not in {
-            "host",
-            "connection",
-            "upgrade",
-            "sec-websocket-key",
-            "sec-websocket-version",
-            "sec-websocket-extensions",
-        }
-    }
     client_ws = web.WebSocketResponse()
     await client_ws.prepare(request)
 
     async with ClientSession() as session:
-        async with session.ws_connect(target, headers=headers, max_msg_size=0) as upstream_ws:
+        async with session.ws_connect(target) as upstream_ws:
 
             async def browser_to_upstream():
-                try:
-                    async for msg in client_ws:
-                        if msg.type == WSMsgType.TEXT:
-                            await upstream_ws.send_str(msg.data)
-                        elif msg.type == WSMsgType.BINARY:
-                            await upstream_ws.send_bytes(msg.data)
-                        elif msg.type == WSMsgType.CLOSE:
-                            await upstream_ws.close()
-                finally:
-                    if not upstream_ws.closed:
+                async for msg in client_ws:
+                    if msg.type == WSMsgType.TEXT:
+                        await upstream_ws.send_str(msg.data)
+                    elif msg.type == WSMsgType.BINARY:
+                        await upstream_ws.send_bytes(msg.data)
+                    elif msg.type == WSMsgType.CLOSE:
                         await upstream_ws.close()
 
             async def upstream_to_browser():
-                try:
-                    async for msg in upstream_ws:
-                        if msg.type == WSMsgType.TEXT:
-                            await client_ws.send_str(msg.data)
-                        elif msg.type == WSMsgType.BINARY:
-                            await client_ws.send_bytes(msg.data)
-                        elif msg.type == WSMsgType.CLOSE:
-                            await client_ws.close()
-                finally:
-                    if not client_ws.closed:
+                async for msg in upstream_ws:
+                    if msg.type == WSMsgType.TEXT:
+                        await client_ws.send_str(msg.data)
+                    elif msg.type == WSMsgType.BINARY:
+                        await client_ws.send_bytes(msg.data)
+                    elif msg.type == WSMsgType.CLOSE:
                         await client_ws.close()
 
-            done, pending = await asyncio.wait(
-                [asyncio.create_task(browser_to_upstream()), asyncio.create_task(upstream_to_browser())],
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-            for task in pending:
-                task.cancel()
-            await asyncio.gather(*done, *pending, return_exceptions=True)
+            await asyncio.gather(browser_to_upstream(), upstream_to_browser())
 
     return client_ws
 
