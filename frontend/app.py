@@ -1177,6 +1177,7 @@ if st.session_state.user_id is not None:
             var parentWin = window.parent;
             var chatUserId = {chat_user_id};
             var chatCartItems = {chat_cart_items};
+            var chatUrl = window.location.origin + "/chat";
             
             // 1. Initialize state in the parent window if it doesn't exist
             if (!parentWin.chatWidgetState) {{
@@ -1419,7 +1420,7 @@ if st.session_state.user_id is not None:
                 
                 var indicator = showTypingIndicator();
                 
-                fetch("{API_URL}/chat", {{
+                fetch(chatUrl, {{
                     method: "POST",
                     headers: {{
                         "Content-Type": "application/json"

@@ -4,6 +4,7 @@ requests
 pandas
 pymysql
 uvicorn
+aiohttp
 PyJWT
 bcrypt
 python-dotenv
