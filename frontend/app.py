@@ -1177,7 +1177,12 @@ if st.session_state.user_id is not None:
             var parentWin = window.parent;
             var chatUserId = {chat_user_id};
             var chatCartItems = {chat_cart_items};
-            var chatUrl = window.location.origin + "/chat";
+            var appOrigin = (
+                parentWin.location &&
+                parentWin.location.origin &&
+                parentWin.location.origin !== "null"
+            ) ? parentWin.location.origin : window.location.origin;
+            var chatUrl = appOrigin + "/chat";
             
             // 1. Initialize state in the parent window if it doesn't exist
             if (!parentWin.chatWidgetState) {{
@@ -1433,7 +1438,13 @@ if st.session_state.user_id is not None:
                     }})
                 }})
                 .then(function(res) {{
-                    return res.json();
+                    return res.text().then(function(text) {{
+                        try {{
+                            return JSON.parse(text);
+                        }} catch (err) {{
+                            throw new Error("Chat endpoint returned non-JSON response: " + text.slice(0, 80));
+                        }}
+                    }});
                 }})
                 .then(function(data) {{
                     indicator.remove();
