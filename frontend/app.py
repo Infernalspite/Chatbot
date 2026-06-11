@@ -1144,28 +1144,361 @@ if st.session_state.user_id is not None:
             st.rerun()
 
 
-# =============== REMOVE OLD FLOATING CHAT WIDGET ===============
+# =============== FLOATING CHAT WIDGET ===============
 import streamlit.components.v1 as components
 
-components.html(
-    """
-    <script>
-    (function() {
-        var parentDoc = window.parent.document;
-        var oldWidget = parentDoc.getElementById("floating-chat-widget");
-        if (oldWidget) {
-            oldWidget.remove();
+if False and st.session_state.user_id is not None:
+    chat_user_id = st.session_state.user_id
+    chat_cart_items = json.dumps([
+        {
+            "product_id": item["product_id"],
+            "name": item["name"],
+            "price": float(item["price"]),
+            "quantity": int(item["quantity"]),
         }
-        var oldStyle = parentDoc.getElementById("floating-chat-widget-style");
-        if (oldStyle) {
-            oldStyle.remove();
-        }
-        if (window.parent.chatWidgetState) {
-            window.parent.chatWidgetState = null;
-        }
-    })();
-    </script>
-    """,
-    height=0,
-    width=0,
-)
+        for item in st.session_state.cart
+    ])
+    components.html(
+        f"""
+        <script>
+        (function() {{
+            var parentDoc = window.parent.document;
+            var parentWin = window.parent;
+            var chatUserId = {chat_user_id};
+            var chatCartItems = {chat_cart_items};
+            
+            // 1. Initialize state in the parent window if it doesn't exist
+            if (!parentWin.chatWidgetState) {{
+                parentWin.chatWidgetState = {{
+                    isOpen: false,
+                    history: [],
+                    messagesHtml: '<div class="message bot">Hello! I\\'m your shopping assistant. How can I help you find products or orders today?</div>',
+                    inputText: ""
+                }};
+            }}
+            
+            // 2. Remove old widget container and styling to refresh handlers
+            var oldWidget = parentDoc.getElementById("floating-chat-widget");
+            if (oldWidget) {{
+                var oldInput = parentDoc.getElementById("chat-message-input");
+                if (oldInput) {{
+                    parentWin.chatWidgetState.inputText = oldInput.value;
+                }}
+                oldWidget.remove();
+            }}
+            
+            var oldStyle = parentDoc.getElementById("floating-chat-widget-style");
+            if (oldStyle) {{
+                oldStyle.remove();
+            }}
+            
+            // 3. Create style element
+            var style = parentDoc.createElement("style");
+            style.id = "floating-chat-widget-style";
+            style.innerHTML = `
+                .chat-btn {{
+                    position: fixed;
+                    bottom: 25px;
+                    right: 25px;
+                    width: 60px;
+                    height: 60px;
+                    border-radius: 50%;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 28px;
+                    cursor: pointer;
+                    z-index: 999999;
+                    transition: all 0.3s ease;
+                }}
+                .chat-btn:hover {{
+                    transform: scale(1.1) rotate(5deg);
+                }}
+                .chat-window {{
+                    position: fixed;
+                    bottom: 95px;
+                    right: 25px;
+                    width: 370px;
+                    height: 500px;
+                    border-radius: 16px;
+                    background: rgba(255, 255, 255, 0.85);
+                    backdrop-filter: blur(10px);
+                    -webkit-backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+                    display: flex;
+                    flex-direction: column;
+                    z-index: 999999;
+                    overflow: hidden;
+                    font-family: 'Inter', -apple-system, sans-serif;
+                    transition: all 0.3s cubic-bezier(0.1, 0.8, 0.3, 1);
+                }}
+                .chat-header {{
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 15px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    font-weight: bold;
+                }}
+                .chat-header .title {{
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: 16px;
+                }}
+                .chat-header .close-btn {{
+                    cursor: pointer;
+                    font-size: 20px;
+                    font-weight: bold;
+                    opacity: 0.8;
+                    transition: opacity 0.2s;
+                }}
+                .chat-header .close-btn:hover {{
+                    opacity: 1;
+                }}
+                .chat-messages {{
+                    flex-grow: 1;
+                    padding: 15px;
+                    overflow-y: auto;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                }}
+                .message {{
+                    max-width: 80%;
+                    padding: 10px 14px;
+                    border-radius: 12px;
+                    font-size: 14px;
+                    line-height: 1.4;
+                    word-wrap: break-word;
+                }}
+                .message.user {{
+                    align-self: flex-end;
+                    background-color: #667eea;
+                    color: white;
+                    border-bottom-right-radius: 2px;
+                }}
+                .message.bot {{
+                    align-self: flex-start;
+                    background-color: rgba(240, 240, 240, 0.9);
+                    color: #333;
+                    border-bottom-left-radius: 2px;
+                }}
+                .chat-input-area {{
+                    padding: 12px;
+                    background: rgba(255, 255, 255, 0.9);
+                    border-top: 1px solid rgba(0,0,0,0.05);
+                    display: flex;
+                    gap: 8px;
+                }}
+                .chat-input {{
+                    flex-grow: 1;
+                    border: 1px solid #ccc;
+                    border-radius: 20px;
+                    padding: 8px 16px;
+                    font-size: 14px;
+                    outline: none;
+                    transition: border 0.2s;
+                }}
+                .chat-input:focus {{
+                    border-color: #667eea;
+                }}
+                .send-btn {{
+                    background: #667eea;
+                    border: none;
+                    color: white;
+                    border-radius: 50%;
+                    width: 36px;
+                    height: 36px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    transition: background 0.2s;
+                }}
+                .send-btn:hover {{
+                    background: #5a6fd6;
+                }}
+                .typing-indicator {{
+                    display: flex;
+                    gap: 4px;
+                    padding: 6px 10px;
+                    align-self: flex-start;
+                    background: rgba(240, 240, 240, 0.9);
+                    border-radius: 10px;
+                }}
+                .typing-dot {{
+                    width: 6px;
+                    height: 6px;
+                    background: #999;
+                    border-radius: 50%;
+                    animation: bounce 1.3s infinite;
+                }}
+                .typing-dot:nth-child(2) {{ animation-delay: 0.15s; }}
+                .typing-dot:nth-child(3) {{ animation-delay: 0.3s; }}
+                @keyframes bounce {{
+                    0%, 60%, 100% {{ transform: translateY(0); }}
+                    30% {{ transform: translateY(-4px); }}
+                }}
+            `;
+            parentDoc.head.appendChild(style);
+            
+            // 4. Create widget container
+            var widgetContainer = parentDoc.createElement("div");
+            widgetContainer.id = "floating-chat-widget";
+            widgetContainer.innerHTML = `
+                <div class="chat-btn" id="chat-toggle-btn">💬</div>
+                <div class="chat-window" id="chat-widget-window">
+                    <div class="chat-header">
+                        <div class="title">✨ Shopping Assistant</div>
+                        <div class="close-btn" id="chat-close-btn">&times;</div>
+                    </div>
+                    <div class="chat-messages" id="chat-messages-container"></div>
+                    <div class="chat-input-area">
+                        <input type="text" class="chat-input" id="chat-message-input" placeholder="Type a message..." autocomplete="off">
+                        <button class="send-btn" id="chat-send-btn">&#10148;</button>
+                    </div>
+                </div>
+            `;
+            parentDoc.body.appendChild(widgetContainer);
+            
+            // Get elements
+            var btn = parentDoc.getElementById("chat-toggle-btn");
+            var windowEl = parentDoc.getElementById("chat-widget-window");
+            var closeBtn = parentDoc.getElementById("chat-close-btn");
+            var messagesContainer = parentDoc.getElementById("chat-messages-container");
+            var inputEl = parentDoc.getElementById("chat-message-input");
+            var sendBtn = parentDoc.getElementById("chat-send-btn");
+            
+            // 5. Restore widget state
+            windowEl.style.display = parentWin.chatWidgetState.isOpen ? "flex" : "none";
+            messagesContainer.innerHTML = parentWin.chatWidgetState.messagesHtml;
+            inputEl.value = parentWin.chatWidgetState.inputText;
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // 6. Define event handlers
+            btn.onclick = function() {{
+                if (windowEl.style.display === "none" || windowEl.style.display === "") {{
+                    windowEl.style.display = "flex";
+                    parentWin.chatWidgetState.isOpen = true;
+                    inputEl.focus();
+                }} else {{
+                    windowEl.style.display = "none";
+                    parentWin.chatWidgetState.isOpen = false;
+                }}
+            }};
+            
+            closeBtn.onclick = function() {{
+                windowEl.style.display = "none";
+                parentWin.chatWidgetState.isOpen = false;
+            }};
+            
+            function sendMessage() {{
+                var text = inputEl.value.trim();
+                if (!text) return;
+                
+                appendMessage("user", text);
+                inputEl.value = "";
+                parentWin.chatWidgetState.inputText = "";
+                
+                var indicator = showTypingIndicator();
+                
+                fetch("{API_URL}/chat", {{
+                    method: "POST",
+                    headers: {{
+                        "Content-Type": "application/json"
+                    }},
+                    body: JSON.stringify({{
+                        message: text,
+                        history: parentWin.chatWidgetState.history,
+                        user_id: chatUserId,
+                        cart_items: chatCartItems
+                    }})
+                }})
+                .then(function(res) {{
+                    return res.json();
+                }})
+                .then(function(data) {{
+                    indicator.remove();
+                    if (data && data.reply) {{
+                        appendMessage("bot", data.reply);
+                        parentWin.chatWidgetState.history.push({{role: "user", content: text}});
+                        parentWin.chatWidgetState.history.push({{role: "assistant", content: data.reply}});
+                    }} else {{
+                        appendMessage("bot", "Sorry, I encountered an issue processing your request.");
+                    }}
+                }})
+                .catch(function(err) {{
+                    indicator.remove();
+                    appendMessage("bot", "Could not reach the support server. Please try again later.");
+                    console.error(err);
+                }});
+            }}
+            
+            sendBtn.onclick = sendMessage;
+            inputEl.onkeypress = function(e) {{
+                if (e.key === "Enter") {{
+                    sendMessage();
+                }}
+            }};
+            
+            function appendMessage(sender, text) {{
+                var msg = parentDoc.createElement("div");
+                msg.className = "message " + sender;
+                msg.innerText = text;
+                messagesContainer.appendChild(msg);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                
+                // Save innerHTML to state
+                parentWin.chatWidgetState.messagesHtml = messagesContainer.innerHTML;
+            }}
+            
+            function showTypingIndicator() {{
+                var indicator = parentDoc.createElement("div");
+                indicator.className = "typing-indicator";
+                indicator.innerHTML = `
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                `;
+                messagesContainer.appendChild(indicator);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                return indicator;
+            }}
+        }})();
+        </script>
+        """,
+        height=0,
+        width=0
+    )
+else:
+    # Ensure widget is removed from DOM when logged out / on login page
+    components.html(
+        """
+        <script>
+        (function() {
+            var parentDoc = window.parent.document;
+            var oldWidget = parentDoc.getElementById("floating-chat-widget");
+            if (oldWidget) {
+                oldWidget.remove();
+            }
+            var oldStyle = parentDoc.getElementById("floating-chat-widget-style");
+            if (oldStyle) {
+                oldStyle.remove();
+            }
+            // Clear parent state
+            if (window.parent.chatWidgetState) {
+                window.parent.chatWidgetState = null;
+            }
+        })();
+        </script>
+        """,
+        height=0,
+        width=0
+    )
+
