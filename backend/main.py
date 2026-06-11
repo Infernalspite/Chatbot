@@ -9,6 +9,8 @@ import json
 import re
 import shutil
 import uuid
+import random
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from pathlib import Path as FilePath
 
@@ -22,6 +24,7 @@ import rbac
 import mange
 import chatbot
 import recommendations  # ← RECOMMENDATION ENGINE
+from setup_db import setup as setup_database
 from product_classifier import (
     CATEGORIES,
     classify_and_update_product,
@@ -46,6 +49,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.on_event("startup")
 def prepare_product_ai_fields():
+    setup_database()
     ensure_product_ai_columns()
     process_uncategorized_products()
 
@@ -56,6 +60,44 @@ app.include_router(mange.router)
 app.include_router(chatbot.router)
 app.include_router(recommendations.router)  # ← RECOMMENDATION ENGINE
 
+
+DELIVERY_STATUSES = [
+    ("Preparing", "Warehouse A", "Order packed and waiting for pickup."),
+    ("Shipped", "North Sorting Center", "Package has left the warehouse."),
+    ("On the way", "City Distribution Hub", "Driver is moving toward the delivery address."),
+    ("Out for delivery", "Near customer area", "Driver is scheduled to arrive today."),
+]
+
+
+def assign_delivery(cursor, order_id: int):
+    cursor.execute("SELECT id FROM users WHERE role = %s ORDER BY id", ("driver",))
+    drivers = cursor.fetchall()
+    if not drivers:
+        return None
+
+    driver = random.choice(drivers)
+    status, location, note = random.choice(DELIVERY_STATUSES)
+    shipped_at = datetime.now() - timedelta(hours=random.randint(1, 30))
+    estimated_delivery = datetime.now() + timedelta(days=random.randint(1, 4))
+    cursor.execute(
+        """
+        INSERT INTO deliveries (
+            order_id, driver_id, status, shipped_at,
+            estimated_delivery, current_location, tracking_note
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            order_id,
+            driver["id"],
+            status,
+            shipped_at,
+            estimated_delivery,
+            location,
+            note,
+        ),
+    )
+    return driver["id"]
 
 @app.get("/users")
 def get_users():
@@ -92,11 +134,19 @@ def get_user(user_id: int = Path(...)):
                 p.name AS product_name,
                 p.price, oi.quantity,
                 o.id AS order_id,
-                oi.product_id
+                oi.product_id,
+                d.status AS delivery_status,
+                d.shipped_at,
+                d.estimated_delivery,
+                d.current_location,
+                d.tracking_note,
+                driver.name AS driver_name
             FROM users u
             LEFT JOIN orders o       ON u.id          = o.user_id
             LEFT JOIN order_items oi ON o.id          = oi.order_id
             LEFT JOIN products p     ON oi.product_id = p.id
+            LEFT JOIN deliveries d    ON d.order_id   = o.id
+            LEFT JOIN users driver    ON driver.id    = d.driver_id
             WHERE u.id = %s
                    """
             cursor.execute(sql, (user_id,))
@@ -497,9 +547,88 @@ def create_order(payload: Order):
             sql_item = "INSERT INTO order_items (order_id, product_id, quantity) VALUES (%s, %s, %s)"
             for item in payload.items:
                 cursor.execute(sql_item, (order_id, item.product_id, item.quantity))
+            driver_id = assign_delivery(cursor, order_id)
             
             connection.commit()
-            return {"message": "Order created successfully", "order_id": order_id}
+            return {
+                "message": "Order created successfully",
+                "order_id": order_id,
+                "driver_id": driver_id,
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        connection.close()
+
+
+@app.get("/deliveries/order/{order_id}")
+def get_delivery_for_order(order_id: int = Path(...)):
+    try:
+        connection = DB_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    d.id AS delivery_id,
+                    d.order_id,
+                    d.driver_id,
+                    driver.name AS driver_name,
+                    d.status,
+                    d.shipped_at,
+                    d.estimated_delivery,
+                    d.current_location,
+                    d.tracking_note,
+                    d.updated_at
+                FROM deliveries d
+                JOIN users driver ON driver.id = d.driver_id
+                WHERE d.order_id = %s
+                """,
+                (order_id,),
+            )
+            delivery = cursor.fetchone()
+            if not delivery:
+                raise HTTPException(status_code=404, detail="Delivery not found")
+            return delivery
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        connection.close()
+
+
+@app.get("/drivers/{driver_id}/deliveries")
+def get_driver_deliveries(driver_id: int = Path(...)):
+    try:
+        connection = DB_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    d.id AS delivery_id,
+                    d.order_id,
+                    d.status,
+                    d.shipped_at,
+                    d.estimated_delivery,
+                    d.current_location,
+                    d.tracking_note,
+                    d.updated_at,
+                    u.id AS customer_id,
+                    u.name AS customer_name,
+                    p.name AS product_name,
+                    p.price,
+                    oi.quantity
+                FROM deliveries d
+                JOIN orders o ON o.id = d.order_id
+                JOIN users u ON u.id = o.user_id
+                JOIN order_items oi ON oi.order_id = o.id
+                JOIN products p ON p.id = oi.product_id
+                WHERE d.driver_id = %s
+                ORDER BY d.updated_at DESC, d.order_id DESC
+                """,
+                (driver_id,),
+            )
+            return cursor.fetchall()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -562,3 +691,4 @@ def get_items():
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         connection.close()
+

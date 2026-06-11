@@ -474,6 +474,7 @@ def user_login():
             
         st.markdown("---")
         st.page_link(register_page, label="📝 Don't have an account? Register here", icon="📝")
+        st.page_link(driver_login_page, label="Driver Login")
 
 def manager_login():
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -509,6 +510,23 @@ def admin_login():
         st.markdown("---")
         st.page_link(user_login_page, label="🛒 Go back to User Login", icon="🛒")
 
+
+def driver_login():
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("---")
+        st.title("Shopping Store")
+        st.markdown("### Driver Portal")
+        st.markdown("Login to view assigned deliveries.")
+        st.markdown("---")
+
+        drv_username = st.text_input("Username", key="drv_user", placeholder="e.g. Ravi Driver")
+        drv_password = st.text_input("Password", type="password", key="drv_pass", placeholder="driver123")
+        if st.button("Login as Driver", key="drv_btn", type="primary", use_container_width=True):
+            handle_login(drv_username, drv_password, "driver")
+
+        st.markdown("---")
+        st.page_link(user_login_page, label="Go back to User Login")
 def register_view():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -569,6 +587,47 @@ def home_page():
     
     # User info bar
     st.info(f"👤 Welcome, **{st.session_state.username}** | Role: **{st.session_state.user_role}** | ID: {st.session_state.user_id}")
+
+    if st.session_state.user_role == "driver":
+        st.subheader("Assigned Deliveries")
+        if st.button("Refresh Deliveries", use_container_width=True):
+            st.rerun()
+
+        try:
+            response = requests.get(f"{API_URL}/drivers/{st.session_state.user_id}/deliveries")
+            if response.status_code == 200:
+                deliveries = response.json()
+                if deliveries:
+                    grouped = {}
+                    for row in deliveries:
+                        grouped.setdefault(row["order_id"], []).append(row)
+
+                    for order_id, rows in grouped.items():
+                        first = rows[0]
+                        with st.container(border=True):
+                            st.markdown(f"### Delivery for Order #{order_id}")
+                            st.markdown(f"**Customer:** {first.get('customer_name')} (ID {first.get('customer_id')})")
+                            st.markdown(f"**Status:** {first.get('status')}")
+                            st.markdown(f"**Location:** {first.get('current_location')}")
+                            st.markdown(f"**Shipped at:** {first.get('shipped_at')}")
+                            st.markdown(f"**Estimated delivery:** {first.get('estimated_delivery')}")
+                            st.caption(first.get("tracking_note") or "")
+
+                            delivery_rows = []
+                            for item in rows:
+                                delivery_rows.append({
+                                    "Product": item.get("product_name"),
+                                    "Quantity": item.get("quantity"),
+                                    "Price": item.get("price"),
+                                })
+                            st.dataframe(pd.DataFrame(delivery_rows), use_container_width=True, hide_index=True)
+                else:
+                    st.info("No deliveries assigned yet.")
+            else:
+                st.error(f"Could not fetch deliveries: {response_detail(response)}")
+        except Exception as e:
+            st.error(f"Error fetching deliveries: {str(e)}")
+        return
     
     # Main tabs - vary based on role
     if st.session_state.user_role == "admin":
@@ -836,6 +895,14 @@ def home_page():
                                     st.markdown(f"### Order #{order_id}")
                                 with col2:
                                     st.markdown(f"**Items:** {len(items)}")
+                                first_item = items[0]
+                                if first_item.get("delivery_status"):
+                                    st.caption(
+                                        f"Delivery: {first_item.get('delivery_status')} | "
+                                        f"Driver: {first_item.get('driver_name') or 'Not assigned'} | "
+                                        f"Location: {first_item.get('current_location') or 'Updating'} | "
+                                        f"ETA: {first_item.get('estimated_delivery') or 'Pending'}"
+                                    )
                                 
                                 order_data = []
                                 total = 0
@@ -1075,12 +1142,13 @@ def home_page():
 user_login_page = st.Page(user_login, title="User Login", url_path="user", default=True)
 manager_login_page = st.Page(manager_login, title="Manager Login", url_path="manager")
 admin_login_page = st.Page(admin_login, title="Admin Login", url_path="admin")
+driver_login_page = st.Page(driver_login, title="Driver Login", url_path="driver")
 register_page = st.Page(register_view, title="Register", url_path="register")
 home_page_obj = st.Page(home_page, title="Home", url_path="home", default=True)
 
 # Run navigation
 if st.session_state.user_id is None:
-    pg = st.navigation([user_login_page, manager_login_page, admin_login_page, register_page], position="hidden")
+    pg = st.navigation([user_login_page, manager_login_page, admin_login_page, driver_login_page, register_page], position="hidden")
 else:
     pg = st.navigation([home_page_obj], position="hidden")
 
@@ -1444,4 +1512,5 @@ else:
         height=0,
         width=0
     )
+
 

@@ -103,10 +103,18 @@ def fetch_user_orders(user_id: Optional[int]) -> str:
                     p.id AS product_id,
                     p.name AS product_name,
                     p.price,
-                    oi.quantity
+                    oi.quantity,
+                    d.status AS delivery_status,
+                    d.shipped_at,
+                    d.estimated_delivery,
+                    d.current_location,
+                    d.tracking_note,
+                    driver.name AS driver_name
                 FROM orders o
                 JOIN order_items oi ON oi.order_id = o.id
                 JOIN products p ON p.id = oi.product_id
+                LEFT JOIN deliveries d ON d.order_id = o.id
+                LEFT JOIN users driver ON driver.id = d.driver_id
                 WHERE o.user_id = %s
                 ORDER BY o.id DESC, oi.id ASC
                 LIMIT 50
@@ -160,7 +168,11 @@ def is_cart_question(message: str) -> bool:
 
 
 def is_order_question(message: str) -> bool:
-    return bool(re.search(r"\b(order|orders|ordered|purchase|purchases|bought|receipt)\b", message, re.I))
+    return bool(re.search(
+        r"\b(order|orders|ordered|purchase|purchases|bought|receipt|delivery|deliveries|shipping|shipped|tracking|status|driver)\b",
+        message,
+        re.I,
+    ))
 
 
 def build_reply_system_prompt(db_context: str, cart_context: str = "", order_context: str = "") -> str:
@@ -169,6 +181,7 @@ def build_reply_system_prompt(db_context: str, cart_context: str = "", order_con
         + "You are a friendly e-commerce customer support assistant.\n"
         "Answer the customer's question warmly and concisely in 2-3 sentences.\n"
         "Use the provided cart context for current cart questions and order context for saved order questions.\n"
+        "For delivery questions, answer from the delivery fields in order context: delivery_status, driver_name, shipped_at, estimated_delivery, current_location, and tracking_note.\n"
         "The cart is not the same as saved orders: cart items are not ordered yet.\n"
         "Never mention SQL, databases, queries, or technical details. Speak naturally.\n\n"
     )

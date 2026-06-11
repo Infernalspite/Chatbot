@@ -7,6 +7,8 @@ Run once:  python setup_db.py   (or python3.11 setup_db.py on Replit)
 
 from database import DB_connection, DB_TYPE
 from auth import hash_password
+import random
+from datetime import datetime, timedelta
 
 
 def setup():
@@ -20,7 +22,9 @@ def setup():
                 _create_tables_postgres(cur)
 
             _seed_users(cur)
+            _ensure_driver_users(cur)
             _seed_products(cur)
+            _ensure_delivery_assignments(cur)
 
         conn.commit()
         print("\nDatabase setup complete.")
@@ -72,6 +76,22 @@ def _create_tables_mysql(cur):
             quantity   INT DEFAULT 1,
             FOREIGN KEY (order_id)   REFERENCES orders(id),
             FOREIGN KEY (product_id) REFERENCES products(id)
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS deliveries (
+            id                 INT AUTO_INCREMENT PRIMARY KEY,
+            order_id           INT NOT NULL UNIQUE,
+            driver_id          INT NOT NULL,
+            status             VARCHAR(50) DEFAULT 'Preparing',
+            shipped_at         DATETIME,
+            estimated_delivery DATETIME,
+            current_location   VARCHAR(150),
+            tracking_note      VARCHAR(255),
+            updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                               ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+            FOREIGN KEY (driver_id) REFERENCES users(id)
         )
     """)
     cur.execute("""
@@ -127,6 +147,19 @@ def _create_tables_postgres(cur):
         )
     """)
     cur.execute("""
+        CREATE TABLE IF NOT EXISTS deliveries (
+            id                 SERIAL PRIMARY KEY,
+            order_id           INTEGER NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
+            driver_id          INTEGER NOT NULL REFERENCES users(id),
+            status             VARCHAR(50) DEFAULT 'Preparing',
+            shipped_at         TIMESTAMP,
+            estimated_delivery TIMESTAMP,
+            current_location   VARCHAR(150),
+            tracking_note      VARCHAR(255),
+            updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS product_embeddings (
             product_id INTEGER     NOT NULL PRIMARY KEY
                        REFERENCES products(id) ON DELETE CASCADE,
@@ -162,6 +195,70 @@ def _seed_users(cur):
             VALUES (%s, %s, %s, %s)
         """, (name, email, role, hash_password(pwd)))
     print(f"  Seeded {len(users)} users.")
+
+
+def _ensure_driver_users(cur):
+    drivers = [
+        ("Ravi Driver", "ravi.driver@example.com", "driver", "driver123"),
+        ("Maya Driver", "maya.driver@example.com", "driver", "driver123"),
+    ]
+    added = 0
+    for name, email, role, pwd in drivers:
+        cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+        if cur.fetchone():
+            continue
+        cur.execute("""
+            INSERT INTO users (name, email, role, password)
+            VALUES (%s, %s, %s, %s)
+        """, (name, email, role, hash_password(pwd)))
+        added += 1
+    if added:
+        print(f"  Seeded {added} driver users.")
+
+
+def _ensure_delivery_assignments(cur):
+    cur.execute("SELECT id FROM users WHERE role = %s ORDER BY id", ("driver",))
+    drivers = cur.fetchall()
+    if not drivers:
+        return
+
+    cur.execute("""
+        SELECT o.id
+        FROM orders o
+        LEFT JOIN deliveries d ON d.order_id = o.id
+        WHERE d.order_id IS NULL
+    """)
+    orders = cur.fetchall()
+    if not orders:
+        return
+
+    statuses = [
+        ("Preparing", "Warehouse A", "Order packed and waiting for pickup."),
+        ("Shipped", "North Sorting Center", "Package has left the warehouse."),
+        ("On the way", "City Distribution Hub", "Driver is moving toward the delivery address."),
+        ("Out for delivery", "Near customer area", "Driver is scheduled to arrive today."),
+    ]
+    for order in orders:
+        driver = random.choice(drivers)
+        status, location, note = random.choice(statuses)
+        shipped_at = datetime.now() - timedelta(hours=random.randint(1, 36))
+        estimated_delivery = datetime.now() + timedelta(days=random.randint(1, 4))
+        cur.execute("""
+            INSERT INTO deliveries (
+                order_id, driver_id, status, shipped_at,
+                estimated_delivery, current_location, tracking_note
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
+            order["id"],
+            driver["id"],
+            status,
+            shipped_at,
+            estimated_delivery,
+            location,
+            note,
+        ))
+    print(f"  Added delivery assignments for {len(orders)} orders.")
 
 
 # ── Seed products ──────────────────────────────────────────────────────────────
