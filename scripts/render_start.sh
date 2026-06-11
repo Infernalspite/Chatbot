@@ -17,9 +17,7 @@ python -m streamlit run frontend/app.py \
   --server.address 127.0.0.1 \
   --server.port 8501 \
   --server.headless true \
-  --browser.gatherUsageStats false \
-  --server.enableCORS false \
-  --server.enableXsrfProtection false &
+  --browser.gatherUsageStats false &
 STREAMLIT_PID=$!
 
 cleanup() {
