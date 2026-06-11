@@ -264,6 +264,35 @@ def build_cart_summary_fallback(items: List[CartItem]) -> str:
     return f"Your cart has {item_count} {item_word}: {product_lines}."
 
 
+def build_order_fallback(order_context: str) -> str:
+    if not order_context or order_context.startswith("ORDER_CONTEXT_ERROR"):
+        return "I could not load your order details right now. Please try again in a moment."
+    if "no saved orders" in order_context.lower():
+        return "You do not have any saved orders yet."
+    if "not logged in" in order_context.lower():
+        return "Please log in first so I can check your order and delivery status."
+
+    try:
+        rows = json.loads(order_context.split("ORDER_CONTEXT:", 1)[1].strip())
+    except Exception:
+        return "Your order details are saved, but I could not format the delivery status right now."
+
+    latest = next((row for row in rows if row.get("order_id")), None)
+    if not latest:
+        return "You do not have any saved orders yet."
+
+    status = latest.get("delivery_status") or "Preparing"
+    order_id = latest.get("order_id")
+    driver = latest.get("driver_name") or "not assigned yet"
+    location = latest.get("current_location") or "being updated"
+    eta = latest.get("estimated_delivery") or "pending"
+    note = latest.get("tracking_note") or "We will update tracking soon."
+    return (
+        f"Order #{order_id} is currently {status}. "
+        f"Driver: {driver}. Location: {location}. Estimated delivery: {eta}. {note}"
+    )
+
+
 @router.post("/cart/summary", response_model=CartSummaryResponse)
 def summarize_cart(body: CartSummaryRequest):
     items = body.items or []
@@ -439,6 +468,11 @@ def chat(body: ChatRequest):
 
     except Exception as err:
         print(f"Chat error: {err}")
+        if is_cart_question(message):
+            return ChatResponse(reply=build_cart_summary_fallback(body.cart_items), error=True)
+        if is_order_question(message):
+            return ChatResponse(reply=build_order_fallback(order_context), error=True)
+
         msg = str(err)
         lower_msg = msg.lower()
         if "groq_api_key" in lower_msg or "missing groq" in lower_msg:
