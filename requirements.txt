@@ -10,4 +10,3 @@ python-dotenv
 python-multipart
 voyageai
 psycopg2-binary
-aiohttp
