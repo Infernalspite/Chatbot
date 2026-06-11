@@ -5,6 +5,7 @@ from typing import List, Literal, Optional
 
 import requests
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from database import DB_connection
@@ -26,6 +27,21 @@ from security import (
 )
 
 router = APIRouter()
+
+
+@router.get("/chat", response_class=HTMLResponse)
+def chat_browser_help():
+    return """
+    <!doctype html>
+    <html>
+      <head><title>Shopsite Chat API</title></head>
+      <body style="font-family: Arial, sans-serif; padding: 32px;">
+        <h2>Shopsite chat API is running.</h2>
+        <p>This address is the backend chat endpoint. Open the shop frontend instead.</p>
+        <p><a href="http://127.0.0.1:8502">Open local shop frontend</a></p>
+      </body>
+    </html>
+    """
 
 
 class Message(BaseModel):
