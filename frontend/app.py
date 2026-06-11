@@ -1087,67 +1087,10 @@ else:
 pg.run()
 
 
-# =============== SERVER-SIDE CHATBOT ===============
-if st.session_state.user_id is not None:
-    if "support_chat_history" not in st.session_state:
-        st.session_state.support_chat_history = [
-            {
-                "role": "assistant",
-                "content": "Hello! I'm your shopping assistant. Ask me about products, your orders, or what's in your cart.",
-            }
-        ]
-
-    with st.sidebar:
-        st.subheader("Shopping Assistant")
-
-        for msg in st.session_state.support_chat_history[-8:]:
-            if msg["role"] == "user":
-                st.markdown(f"**You:** {msg['content']}")
-            else:
-                st.markdown(f"**Assistant:** {msg['content']}")
-
-        with st.form("support_chat_form", clear_on_submit=True):
-            chat_prompt = st.text_input("Ask a question", placeholder="What is in my cart?")
-            chat_submitted = st.form_submit_button("Send", use_container_width=True)
-
-        if chat_submitted and chat_prompt.strip():
-            user_message = chat_prompt.strip()
-            st.session_state.support_chat_history.append({"role": "user", "content": user_message})
-            try:
-                response = requests.post(
-                    f"{API_URL}/chat",
-                    json={
-                        "message": user_message,
-                        "history": st.session_state.support_chat_history[-10:],
-                        "user_id": st.session_state.user_id,
-                        "cart_items": [
-                            {
-                                "product_id": item["product_id"],
-                                "name": item["name"],
-                                "price": float(item["price"]),
-                                "quantity": int(item["quantity"]),
-                            }
-                            for item in st.session_state.cart
-                        ],
-                    },
-                    timeout=60,
-                )
-                if response.status_code == 200:
-                    reply = response.json().get("reply", "Sorry, I could not answer that.")
-                else:
-                    reply = f"Sorry, I could not reach the support server. {response_detail(response)}"
-            except Exception as e:
-                reply = f"Sorry, I could not reach the support server. {str(e)}"
-
-            st.session_state.support_chat_history.append({"role": "assistant", "content": reply})
-            st.session_state.support_chat_history = st.session_state.support_chat_history[-10:]
-            st.rerun()
-
-
 # =============== FLOATING CHAT WIDGET ===============
 import streamlit.components.v1 as components
 
-if False and st.session_state.user_id is not None:
+if st.session_state.user_id is not None:
     chat_user_id = st.session_state.user_id
     chat_cart_items = json.dumps([
         {
