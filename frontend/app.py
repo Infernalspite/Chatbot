@@ -12,6 +12,248 @@ st.set_page_config(page_title="Shopping Store", layout="wide")
 # Backend API URL
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
+
+def apply_app_theme():
+    st.markdown(
+        """
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+            :root {
+                --shop-ink: #16202a;
+                --shop-muted: #64748b;
+                --shop-line: rgba(15, 23, 42, 0.08);
+                --shop-panel: rgba(255, 255, 255, 0.94);
+                --shop-accent: #0f766e;
+                --shop-accent-2: #2563eb;
+                --shop-warm: #f59e0b;
+                --shop-danger: #dc2626;
+            }
+
+            html, body, [class*="css"], .stApp {
+                font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                color: var(--shop-ink);
+            }
+
+            .stApp {
+                background:
+                    radial-gradient(circle at 10% 20%, rgba(37, 99, 235, 0.08), transparent 40rem),
+                    radial-gradient(circle at 90% 10%, rgba(15, 118, 110, 0.10), transparent 35rem),
+                    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 50%, #f8fafc 100%);
+            }
+
+            [data-testid="stHeader"] {
+                background: rgba(248, 250, 252, 0.72);
+                backdrop-filter: blur(14px);
+            }
+
+            .block-container {
+                max-width: 1220px;
+                padding-top: 2rem;
+                padding-bottom: 4rem;
+            }
+
+            h1, h2, h3, h4, h5, h6 {
+                letter-spacing: -0.02em;
+                color: var(--shop-ink);
+                font-weight: 700;
+            }
+
+            p, label, .stMarkdown, [data-testid="stCaptionContainer"] {
+                color: var(--shop-ink);
+            }
+
+            div[data-testid="stVerticalBlockBorderWrapper"] {
+                border: 1px solid var(--shop-line);
+                border-radius: 12px;
+                background: var(--shop-panel);
+                box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+                transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease;
+            }
+
+            div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+                border-color: rgba(15, 118, 110, 0.22);
+            }
+
+            div[data-testid="stAlert"] {
+                border-radius: 10px;
+                border: 1px solid rgba(15, 118, 110, 0.18);
+            }
+
+            .stTabs [data-baseweb="tab-list"] {
+                gap: 12px;
+                border-bottom: 2px solid var(--shop-line);
+                padding: 4px 0;
+            }
+
+            .stTabs [data-baseweb="tab"] {
+                border-radius: 8px;
+                padding: 8px 18px;
+                font-weight: 600;
+                color: var(--shop-muted);
+                transition: all 0.2s ease;
+                border: none !important;
+            }
+
+            .stTabs [data-baseweb="tab"]:hover {
+                color: var(--shop-accent-2);
+                background: rgba(37, 99, 235, 0.05);
+            }
+
+            .stTabs [aria-selected="true"] {
+                color: var(--shop-accent) !important;
+                background: rgba(15, 118, 110, 0.08) !important;
+                font-weight: 700;
+            }
+
+            .stButton > button {
+                border-radius: 8px;
+                border: 1px solid rgba(15, 23, 42, 0.12);
+                font-weight: 600;
+                background-color: white;
+                color: var(--shop-ink);
+                padding: 0.5rem 1rem;
+                transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            .stButton > button:hover {
+                transform: translateY(-1px);
+                border-color: var(--shop-accent);
+                color: var(--shop-accent);
+                box-shadow: 0 4px 12px rgba(15, 118, 110, 0.08);
+            }
+
+            .stButton > button[kind="primary"] {
+                background: linear-gradient(135deg, var(--shop-accent) 0%, var(--shop-accent-2) 100%);
+                border: none;
+                color: white !important;
+            }
+
+            .stButton > button[kind="primary"]:hover {
+                color: white !important;
+                box-shadow: 0 6px 18px rgba(37, 99, 235, 0.25);
+                filter: brightness(1.05);
+            }
+
+            .stTextInput input,
+            .stNumberInput input,
+            .stSelectbox div[data-baseweb="select"] > div {
+                border-radius: 8px;
+                border-color: rgba(15, 23, 42, 0.12);
+                background: rgba(255, 255, 255, 0.98);
+                font-family: 'Outfit', sans-serif;
+            }
+
+            .shop-hero {
+                border: 1px solid var(--shop-line);
+                border-radius: 14px;
+                background:
+                    linear-gradient(135deg, rgba(15, 118, 110, 0.12), rgba(37, 99, 235, 0.10)),
+                    rgba(255,255,255,0.72);
+                padding: 22px 24px;
+                margin-bottom: 24px;
+                box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+            }
+
+            .shop-hero h1 {
+                margin: 0;
+                font-size: 2.2rem;
+                letter-spacing: -0.03em;
+            }
+
+            .shop-hero p {
+                margin: 8px 0 0 0;
+                color: var(--shop-muted);
+                font-size: 1.05rem;
+            }
+
+            .category-header {
+                font-size: 1.4rem;
+                font-weight: 800;
+                border-bottom: 2px solid var(--shop-accent);
+                padding-bottom: 0.3rem;
+                margin-top: 1.8rem;
+                margin-bottom: 1.2rem;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                color: var(--shop-ink);
+            }
+
+            .product-title {
+                font-size: 1.12rem;
+                font-weight: 800;
+                min-height: 2.6rem;
+                margin: 0.45rem 0 0.2rem;
+                letter-spacing: -0.01em;
+            }
+
+            .product-price {
+                display: inline-flex;
+                align-items: center;
+                border-radius: 999px;
+                padding: 5px 12px;
+                background: rgba(37, 99, 235, 0.08);
+                color: #2563eb;
+                font-weight: 800;
+                margin-bottom: 0.35rem;
+                font-size: 0.95rem;
+            }
+
+            .stock-badge {
+                display: inline-flex;
+                align-items: center;
+                border-radius: 999px;
+                padding: 4px 10px;
+                font-size: 0.82rem;
+                font-weight: 700;
+                margin: 0.25rem 0 0.65rem;
+            }
+
+            .stock-good {
+                background: rgba(15, 118, 110, 0.10);
+                color: #0f766e;
+            }
+
+            .stock-low {
+                background: rgba(245, 158, 11, 0.12);
+                color: #b45309;
+            }
+
+            .stock-out {
+                background: rgba(220, 38, 38, 0.08);
+                color: #b91c1c;
+            }
+
+            .section-label {
+                color: var(--shop-muted);
+                font-size: 0.86rem;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                margin-bottom: -0.2rem;
+            }
+
+            @media (max-width: 760px) {
+                .block-container {
+                    padding-left: 1rem;
+                    padding-right: 1rem;
+                }
+
+                .shop-hero h1 {
+                    font-size: 1.55rem;
+                }
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+apply_app_theme()
+
 # Initialize session state
 if "cart" not in st.session_state:
     st.session_state.cart = []
@@ -459,120 +701,127 @@ def handle_login(username, password, expected_role):
         st.warning("⚠️ Please enter both Username and Password")
 
 def user_login():
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 2.5, 1])
     with col2:
-        st.markdown("---")
-        st.title("🛍️ Shopping Store")
-        st.markdown("### 🛒 User Portal")
-        st.markdown("Welcome! Please login to continue.")
-        st.markdown("---")
-        
-        user_username = st.text_input("Username", key="user_user", placeholder="e.g. John Doe")
-        user_password = st.text_input("Password", type="password", key="user_pass", placeholder="••••")
-        if st.button("Login as User", key="user_btn", type="primary", use_container_width=True):
-            handle_login(user_username, user_password, "user")
+        with st.container(border=True):
+            st.markdown("<h2 style='text-align: center; margin-bottom: 0.2rem;'>🛍️ Shopping Store</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; color: var(--shop-muted); margin-bottom: 1.5rem;'>🛒 User Portal &bull; Welcome back!</p>", unsafe_allow_html=True)
             
-        st.markdown("---")
-        st.page_link(register_page, label="📝 Don't have an account? Register here", icon="📝")
-        st.page_link(driver_login_page, label="Driver Login")
+            user_username = st.text_input("Username", key="user_user", placeholder="e.g. John Doe")
+            user_password = st.text_input("Password", type="password", key="user_pass", placeholder="••••")
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            if st.button("Login as User", key="user_btn", type="primary", use_container_width=True):
+                handle_login(user_username, user_password, "user")
+                
+            st.markdown("<div style='margin: 1.2rem 0; border-top: 1px solid var(--shop-line);'></div>", unsafe_allow_html=True)
+            st.page_link(register_page, label="📝 Create an Account", use_container_width=True)
+            
+            col_links = st.columns(3)
+            with col_links[0]:
+                st.page_link(driver_login_page, label="🚚 Driver", use_container_width=True)
+            with col_links[1]:
+                st.page_link(manager_login_page, label="📊 Manager", use_container_width=True)
+            with col_links[2]:
+                st.page_link(admin_login_page, label="👨‍💼 Admin", use_container_width=True)
 
 def manager_login():
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 2.5, 1])
     with col2:
-        st.markdown("---")
-        st.title("🛍️ Shopping Store")
-        st.markdown("### 📊 Manager Portal")
-        st.markdown("Welcome! Please login to manage the store.")
-        st.markdown("---")
-        
-        mgr_username = st.text_input("Username", key="mgr_user", placeholder="e.g. John Doe")
-        mgr_password = st.text_input("Password", type="password", key="mgr_pass", placeholder="••••")
-        if st.button("Login as Manager", key="mgr_btn", type="primary", use_container_width=True):
-            handle_login(mgr_username, mgr_password, "manager")
+        with st.container(border=True):
+            st.markdown("<h2 style='text-align: center; margin-bottom: 0.2rem;'>🛍️ Shopping Store</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; color: var(--shop-muted); margin-bottom: 1.5rem;'>📊 Manager Portal &bull; Welcome back!</p>", unsafe_allow_html=True)
             
-        st.markdown("---")
-        st.page_link(user_login_page, label="🛒 Go back to User Login", icon="🛒")
+            mgr_username = st.text_input("Username", key="mgr_user", placeholder="e.g. John Doe")
+            mgr_password = st.text_input("Password", type="password", key="mgr_pass", placeholder="••••")
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            if st.button("Login as Manager", key="mgr_btn", type="primary", use_container_width=True):
+                handle_login(mgr_username, mgr_password, "manager")
+                
+            st.markdown("<div style='margin: 1.2rem 0; border-top: 1px solid var(--shop-line);'></div>", unsafe_allow_html=True)
+            st.page_link(user_login_page, label="🛒 Back to User Login", use_container_width=True)
 
 def admin_login():
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 2.5, 1])
     with col2:
-        st.markdown("---")
-        st.title("🛍️ Shopping Store")
-        st.markdown("### 👨‍💼 Admin Portal")
-        st.markdown("Administrator authentication required.")
-        st.markdown("---")
-        
-        adm_username = st.text_input("Username", key="adm_user", placeholder="e.g. John Doe")
-        adm_password = st.text_input("Password", type="password", key="adm_pass", placeholder="••••")
-        if st.button("Login as Admin", key="adm_btn", type="primary", use_container_width=True):
-            handle_login(adm_username, adm_password, "admin")
+        with st.container(border=True):
+            st.markdown("<h2 style='text-align: center; margin-bottom: 0.2rem;'>🛍️ Shopping Store</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; color: var(--shop-muted); margin-bottom: 1.5rem;'>👨‍💼 Admin Portal &bull; Auth required</p>", unsafe_allow_html=True)
             
-        st.markdown("---")
-        st.page_link(user_login_page, label="🛒 Go back to User Login", icon="🛒")
+            adm_username = st.text_input("Username", key="adm_user", placeholder="e.g. John Doe")
+            adm_password = st.text_input("Password", type="password", key="adm_pass", placeholder="••••")
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            if st.button("Login as Admin", key="adm_btn", type="primary", use_container_width=True):
+                handle_login(adm_username, adm_password, "admin")
+                
+            st.markdown("<div style='margin: 1.2rem 0; border-top: 1px solid var(--shop-line);'></div>", unsafe_allow_html=True)
+            st.page_link(user_login_page, label="🛒 Back to User Login", use_container_width=True)
 
 
 def driver_login():
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 2.5, 1])
     with col2:
-        st.markdown("---")
-        st.title("Shopping Store")
-        st.markdown("### Driver Portal")
-        st.markdown("Login to view assigned deliveries.")
-        st.markdown("---")
+        with st.container(border=True):
+            st.markdown("<h2 style='text-align: center; margin-bottom: 0.2rem;'>Shopping Store</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; color: var(--shop-muted); margin-bottom: 1.5rem;'>🚚 Driver Portal &bull; Deliveries lookup</p>", unsafe_allow_html=True)
 
-        drv_username = st.text_input("Username", key="drv_user", placeholder="e.g. Ravi Driver")
-        drv_password = st.text_input("Password", type="password", key="drv_pass", placeholder="driver123")
-        if st.button("Login as Driver", key="drv_btn", type="primary", use_container_width=True):
-            handle_login(drv_username, drv_password, "driver")
+            drv_username = st.text_input("Username", key="drv_user", placeholder="e.g. Ravi Driver")
+            drv_password = st.text_input("Password", type="password", key="drv_pass", placeholder="driver123")
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            if st.button("Login as Driver", key="drv_btn", type="primary", use_container_width=True):
+                handle_login(drv_username, drv_password, "driver")
 
-        st.markdown("---")
-        st.page_link(user_login_page, label="Go back to User Login")
+            st.markdown("<div style='margin: 1.2rem 0; border-top: 1px solid var(--shop-line);'></div>", unsafe_allow_html=True)
+            st.page_link(user_login_page, label="🛒 Back to User Login", use_container_width=True)
+
 def register_view():
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 2.5, 1])
     with col2:
-        st.markdown("---")
-        st.title("🛍️ Shopping Store")
-        st.markdown("### 📝 Create New Account")
-        st.markdown("Register below to join the store.")
-        st.markdown("---")
-        
-        new_name = st.text_input("Full Name (Username)", key="reg_user", placeholder="John Doe")
-        new_email = st.text_input("Email Address", key="reg_email", placeholder="john@example.com")
-        new_password = st.text_input("Password", type="password", key="reg_pass", placeholder="Enter secure password")
-        
-        if st.button("Register", key="reg_btn", type="primary", use_container_width=True):
-            if new_name and new_email and new_password:
-                try:
-                    response = requests.post(
-                        f"{API_URL}/users",
-                        json={"name": new_name, "email": new_email, "password": new_password}
-                    )
-                    if response.status_code == 200:
-                        st.success("✅ Account created successfully!")
-                        st.balloons()
-                        st.info("📌 Redirecting you to the user login page...")
-                        st.switch_page(user_login_page)
-                    else:
-                        st.error(f"❌ Error creating account: {response.json().get('detail', 'Unknown error')}")
-                except Exception as e:
-                    st.error(f"❌ Error: {str(e)}")
-            else:
-                st.warning("⚠️ Please fill in all fields (Name, Email, and Password)")
-                
-        st.markdown("---")
-        st.page_link(user_login_page, label="🛒 Already have an account? User Login", icon="🛒")
+        with st.container(border=True):
+            st.markdown("<h2 style='text-align: center; margin-bottom: 0.2rem;'>🛍️ Shopping Store</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; color: var(--shop-muted); margin-bottom: 1.5rem;'>📝 Create New Account</p>", unsafe_allow_html=True)
+            
+            new_name = st.text_input("Full Name (Username)", key="reg_user", placeholder="John Doe")
+            new_email = st.text_input("Email Address", key="reg_email", placeholder="john@example.com")
+            new_password = st.text_input("Password", type="password", key="reg_pass", placeholder="Enter secure password")
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            
+            if st.button("Register", key="reg_btn", type="primary", use_container_width=True):
+                if new_name and new_email and new_password:
+                    try:
+                        response = requests.post(
+                            f"{API_URL}/users",
+                            json={"name": new_name, "email": new_email, "password": new_password}
+                        )
+                        if response.status_code == 200:
+                            st.success("✅ Account created successfully!")
+                            st.balloons()
+                            st.info("📌 Redirecting you to the user login page...")
+                            st.switch_page(user_login_page)
+                        else:
+                            st.error(f"❌ Error creating account: {response.json().get('detail', 'Unknown error')}")
+                    except Exception as e:
+                        st.error(f"❌ Error: {str(e)}")
+                else:
+                    st.warning("⚠️ Please fill in all fields (Name, Email, and Password)")
+                    
+            st.markdown("<div style='margin: 1.2rem 0; border-top: 1px solid var(--shop-line);'></div>", unsafe_allow_html=True)
+            st.page_link(user_login_page, label="🛒 Already have an account? User Login", use_container_width=True)
 
 
 # =============== HOME PAGE ===============
 def home_page():
     """Main home page after login"""
-    # Top bar with user info and logout
-    col1, col2, col3 = st.columns([2, 1, 1])
-    
-    with col1:
-        st.title("🛍️ Shopping Store")
-    
-    with col3:
+    # Sleek header bar with logout and user details
+    col_hdr1, col_hdr2 = st.columns([4, 1])
+    with col_hdr1:
+        st.markdown(
+            f"<div style='padding-top: 0.5rem;'>"
+            f"👤 Welcome back, <strong>{st.session_state.username}</strong>! "
+            f"<span style='color: var(--shop-muted); font-size: 0.9rem;'>&bull; Role: {st.session_state.user_role.upper()} &bull; ID: #{st.session_state.user_id}</span>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+    with col_hdr2:
         if st.button("🚪 Logout", use_container_width=True):
             st.session_state.user_id = None
             st.session_state.username = None
@@ -580,13 +829,19 @@ def home_page():
             st.session_state.token = None
             st.session_state.cart = []
             st.session_state.recommendations = []   # ← RECOMMENDATION ENGINE
-            st.success("✅ Logged out successfully!")
+            st.success("Logged out!")
             st.rerun()
-    
-    st.divider()
-    
-    # User info bar
-    st.info(f"👤 Welcome, **{st.session_state.username}** | Role: **{st.session_state.user_role}** | ID: {st.session_state.user_id}")
+
+    st.markdown(
+        """
+        <div class="shop-hero">
+            <div class="section-label">AI powered shopping</div>
+            <h1>Shopping Store</h1>
+            <p>Browse curated products, get cart-aware recommendations, and track delivery updates in one place.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if st.session_state.user_role == "driver":
         st.subheader("Assigned Deliveries")
@@ -607,20 +862,21 @@ def home_page():
                         with st.container(border=True):
                             st.markdown(f"### Delivery for Order #{order_id}")
                             st.markdown(f"**Customer:** {first.get('customer_name')} (ID {first.get('customer_id')})")
-                            st.markdown(f"**Status:** {first.get('status')}")
-                            st.markdown(f"**Location:** {first.get('current_location')}")
-                            st.markdown(f"**Shipped at:** {first.get('shipped_at')}")
-                            st.markdown(f"**Estimated delivery:** {first.get('estimated_delivery')}")
-                            st.caption(first.get("tracking_note") or "")
+                            st.markdown(f"**Status:** {first.get('status')} | **Location:** {first.get('current_location')}")
+                            st.markdown(f"**Shipped:** {first.get('shipped_at')} | **ETA:** {first.get('estimated_delivery')}")
+                            if first.get("tracking_note"):
+                                st.caption(first.get("tracking_note"))
 
-                            delivery_rows = []
+                            st.markdown("#### Items to Deliver")
                             for item in rows:
-                                delivery_rows.append({
-                                    "Product": item.get("product_name"),
-                                    "Quantity": item.get("quantity"),
-                                    "Price": item.get("price"),
-                                })
-                            st.dataframe(pd.DataFrame(delivery_rows), use_container_width=True, hide_index=True)
+                                item_total = item.get('price', 0) * item.get('quantity', 0)
+                                col_del1, col_del2, col_del3 = st.columns([3, 1, 1])
+                                with col_del1:
+                                    st.markdown(f"**{item.get('product_name')}**")
+                                with col_del2:
+                                    st.markdown(f"{item.get('quantity')}x")
+                                with col_del3:
+                                    st.markdown(f"**${item_total:.2f}**")
                 else:
                     st.info("No deliveries assigned yet.")
             else:
@@ -657,7 +913,8 @@ def home_page():
                 key="shop_sort_filter",
             )
         with col4:
-            refresh = st.button("Refresh")
+            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+            refresh = st.button("Refresh", use_container_width=True)
         
         categories = ["Electronics", "Furniture", "Cosmetics", "Other"]
         category_labels = {
@@ -706,7 +963,16 @@ def home_page():
                     continue
 
                 rendered_any = True
-                st.markdown(f"## {category_labels[category]}")
+                category_icons = {
+                    "Electronics": "💻",
+                    "Furniture": "🛋️",
+                    "Cosmetics": "💅",
+                    "Other": "📦"
+                }
+                st.markdown(
+                    f"<div class='category-header'>{category_icons.get(category, '📦')} {category_labels[category]}</div>", 
+                    unsafe_allow_html=True
+                )
                 cols = st.columns(3)
                 for idx, product in enumerate(products):
                     with cols[idx % 3]:
@@ -783,24 +1049,26 @@ def home_page():
 
             total_price = 0
             
-            # Column headers for visual layout
-            col_h1, col_h2, col_h3, col_h4 = st.columns([4, 2, 2, 1])
-            with col_h1:
-                st.markdown("**Product**")
-            with col_h2:
-                st.markdown("**Quantity**")
-            with col_h3:
-                st.markdown("**Total**")
-            with col_h4:
-                st.markdown("**Delete**")
-            
             to_remove = None
             
-            for idx, item in enumerate(st.session_state.cart):
-                item_total = item['price'] * item['quantity']
-                total_price += item_total
+            with st.container(border=True):
+                # Column headers for visual layout
+                col_h1, col_h2, col_h3, col_h4 = st.columns([4, 2, 2, 1])
+                with col_h1:
+                    st.markdown("**Product**")
+                with col_h2:
+                    st.markdown("**Quantity**")
+                with col_h3:
+                    st.markdown("**Total**")
+                with col_h4:
+                    st.markdown("**Delete**")
                 
-                with st.container(border=True):
+                st.markdown("<div style='margin-bottom: 0.6rem; border-top: 1px solid var(--shop-line);'></div>", unsafe_allow_html=True)
+                
+                for idx, item in enumerate(st.session_state.cart):
+                    item_total = item['price'] * item['quantity']
+                    total_price += item_total
+                    
                     col1, col2, col3, col4 = st.columns([4, 2, 2, 1])
                     with col1:
                         st.markdown(f"**{item['name']}**")
@@ -817,10 +1085,13 @@ def home_page():
                             st.session_state.cart[idx]['quantity'] = new_qty
                             st.rerun()
                     with col3:
-                        st.markdown(f"**${item_total:.2f}**")
+                        st.markdown(f"<div style='padding-top: 8px;'><strong>${item_total:.2f}</strong></div>", unsafe_allow_html=True)
                     with col4:
                         if st.button("🗑️", key=f"cart_del_{item['product_id']}_{idx}", use_container_width=True):
                             to_remove = idx
+                            
+                    if idx < len(st.session_state.cart) - 1:
+                        st.markdown("<div style='margin: 0.5rem 0; border-top: 1px solid rgba(15, 23, 42, 0.04);'></div>", unsafe_allow_html=True)
             
             if to_remove is not None:
                 removed_item = st.session_state.cart.pop(to_remove)
@@ -904,23 +1175,25 @@ def home_page():
                                         f"ETA: {first_item.get('estimated_delivery') or 'Pending'}"
                                     )
                                 
-                                order_data = []
                                 total = 0
+                                st.markdown("<div style='margin-bottom: 0.5rem; border-top: 1px solid var(--shop-line);'></div>", unsafe_allow_html=True)
                                 for item in items:
                                     item_total = item['price'] * item['quantity']
                                     total += item_total
-                                    order_data.append({
-                                        "Product": item['product_name'],
-                                        "Price": f"${item['price']:.2f}",
-                                        "Quantity": item['quantity'],
-                                        "Total": f"${item_total:.2f}"
-                                    })
+                                    
+                                    col_item1, col_item2, col_item3 = st.columns([3, 1, 1])
+                                    with col_item1:
+                                        st.markdown(f"**{item['product_name']}**")
+                                        st.caption(f"Unit Price: ${item['price']:.2f}")
+                                    with col_item2:
+                                        st.markdown(f"<div style='padding-top: 4px;'>{item['quantity']}x</div>", unsafe_allow_html=True)
+                                    with col_item3:
+                                        st.markdown(f"<div style='padding-top: 4px;'><strong>${item_total:.2f}</strong></div>", unsafe_allow_html=True)
                                 
-                                df = pd.DataFrame(order_data)
-                                st.dataframe(df, use_container_width=True, hide_index=True)
-                                st.markdown(f"**Order Total:** ${total:.2f}")
+                                st.markdown("<div style='margin: 0.6rem 0; border-top: 1px dotted var(--shop-line);'></div>", unsafe_allow_html=True)
+                                st.markdown(f"<div style='text-align: right;'><strong>Order Total: <span style='font-size: 1.15rem; color: var(--shop-accent-2);'>${total:.2f}</span></strong></div>", unsafe_allow_html=True)
                     else:
-                        st.info("ðŸ“¦ No orders yet. Start shopping! ðŸ›ï¸")
+                        st.info("📦 No orders yet. Start shopping! 🛍️")
                 else:
                     st.info("📦 No orders yet. Start shopping! 🛍️")
             else:
@@ -933,7 +1206,7 @@ def home_page():
         with tab_admin:
             st.subheader("👨‍💼 Admin Dashboard")
             
-            admin_section = st.radio("Select Section", ["👥 Manage Users", "🔍 View All Orders", "➕ Add Product", "📝 Manage Products"], key="admin_section")
+            admin_section = st.radio("Select Section", ["👥 Manage Users", "🔍 View All Orders", "➕ Add Product", "📝 Manage Products"], key="admin_section", horizontal=True)
             
             # MANAGE USERS SECTION
             if admin_section == "👥 Manage Users":
@@ -1088,7 +1361,7 @@ def home_page():
         with tab_manager:
             st.subheader("📊 Manager Dashboard")
             
-            manager_section = st.radio("Select Section", ["➕ Add Product", "📝 Manage Products", "👥 View Users & Managers"], key="manager_section")
+            manager_section = st.radio("Select Section", ["➕ Add Product", "📝 Manage Products", "👥 View Users & Managers"], key="manager_section", horizontal=True)
             
             # ADD PRODUCT SECTION
             if manager_section == "➕ Add Product":
@@ -1217,11 +1490,11 @@ if st.session_state.user_id is not None:
                     position: fixed;
                     bottom: 25px;
                     right: 25px;
-                    width: 60px;
-                    height: 60px;
+                    width: 58px;
+                    height: 58px;
                     border-radius: 50%;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+                    background: linear-gradient(135deg, #0f766e 0%, #2563eb 100%);
+                    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.24);
                     display: flex;
                     align-items: center;
                     justify-content: center;
@@ -1229,34 +1502,35 @@ if st.session_state.user_id is not None:
                     font-size: 28px;
                     cursor: pointer;
                     z-index: 999999;
-                    transition: all 0.3s ease;
+                    transition: transform 0.18s ease, box-shadow 0.18s ease;
                 }}
                 .chat-btn:hover {{
-                    transform: scale(1.1) rotate(5deg);
+                    transform: translateY(-2px) scale(1.04);
+                    box-shadow: 0 20px 44px rgba(15, 23, 42, 0.30);
                 }}
                 .chat-window {{
                     position: fixed;
                     bottom: 95px;
                     right: 25px;
-                    width: 370px;
-                    height: 500px;
-                    border-radius: 16px;
-                    background: rgba(255, 255, 255, 0.85);
-                    backdrop-filter: blur(10px);
-                    -webkit-backdrop-filter: blur(10px);
-                    border: 1px solid rgba(255, 255, 255, 0.3);
-                    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+                    width: min(380px, calc(100vw - 30px));
+                    height: min(520px, calc(100vh - 125px));
+                    border-radius: 18px;
+                    background: rgba(255, 255, 255, 0.96);
+                    backdrop-filter: blur(16px);
+                    -webkit-backdrop-filter: blur(16px);
+                    border: 1px solid rgba(15, 23, 42, 0.12);
+                    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
                     display: flex;
                     flex-direction: column;
                     z-index: 999999;
                     overflow: hidden;
-                    font-family: 'Inter', -apple-system, sans-serif;
+                    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                     transition: all 0.3s cubic-bezier(0.1, 0.8, 0.3, 1);
                 }}
                 .chat-header {{
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    background: linear-gradient(135deg, #0f766e 0%, #2563eb 100%);
                     color: white;
-                    padding: 15px;
+                    padding: 14px 16px;
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
@@ -1266,7 +1540,7 @@ if st.session_state.user_id is not None:
                     display: flex;
                     align-items: center;
                     gap: 8px;
-                    font-size: 16px;
+                    font-size: 15px;
                 }}
                 .chat-header .close-btn {{
                     cursor: pointer;
@@ -1280,53 +1554,72 @@ if st.session_state.user_id is not None:
                 }}
                 .chat-messages {{
                     flex-grow: 1;
-                    padding: 15px;
+                    padding: 14px;
                     overflow-y: auto;
                     display: flex;
                     flex-direction: column;
                     gap: 10px;
                 }}
+                .chat-messages::-webkit-scrollbar {{
+                    width: 6px;
+                }}
+                .chat-messages::-webkit-scrollbar-track {{
+                    background: transparent;
+                }}
+                .chat-messages::-webkit-scrollbar-thumb {{
+                    background: rgba(15, 23, 42, 0.12);
+                    border-radius: 3px;
+                }}
+                .chat-messages::-webkit-scrollbar-thumb:hover {{
+                    background: rgba(15, 23, 42, 0.24);
+                }}
+                @keyframes fadeIn {{
+                    from {{ opacity: 0; transform: translateY(8px); }}
+                    to {{ opacity: 1; transform: translateY(0); }}
+                }}
                 .message {{
                     max-width: 80%;
                     padding: 10px 14px;
-                    border-radius: 12px;
+                    border-radius: 14px;
                     font-size: 14px;
                     line-height: 1.4;
                     word-wrap: break-word;
+                    animation: fadeIn 0.22s ease-out forwards;
                 }}
                 .message.user {{
                     align-self: flex-end;
-                    background-color: #667eea;
+                    background: linear-gradient(135deg, #2563eb, #0f766e);
                     color: white;
                     border-bottom-right-radius: 2px;
                 }}
                 .message.bot {{
                     align-self: flex-start;
-                    background-color: rgba(240, 240, 240, 0.9);
-                    color: #333;
+                    background-color: #f1f5f9;
+                    color: #16202a;
                     border-bottom-left-radius: 2px;
                 }}
                 .chat-input-area {{
                     padding: 12px;
-                    background: rgba(255, 255, 255, 0.9);
-                    border-top: 1px solid rgba(0,0,0,0.05);
+                    background: rgba(255, 255, 255, 0.8);
+                    border-top: 1px solid rgba(15, 23, 42, 0.08);
                     display: flex;
                     gap: 8px;
                 }}
                 .chat-input {{
                     flex-grow: 1;
-                    border: 1px solid #ccc;
-                    border-radius: 20px;
+                    border: 1px solid rgba(15, 23, 42, 0.14);
+                    border-radius: 999px;
                     padding: 8px 16px;
                     font-size: 14px;
                     outline: none;
-                    transition: border 0.2s;
+                    transition: border 0.2s, box-shadow 0.2s;
                 }}
                 .chat-input:focus {{
-                    border-color: #667eea;
+                    border-color: #0f766e;
+                    box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.15);
                 }}
                 .send-btn {{
-                    background: #667eea;
+                    background: #0f766e;
                     border: none;
                     color: white;
                     border-radius: 50%;
@@ -1336,10 +1629,11 @@ if st.session_state.user_id is not None:
                     align-items: center;
                     justify-content: center;
                     cursor: pointer;
-                    transition: background 0.2s;
+                    transition: background 0.2s, transform 0.15s;
                 }}
                 .send-btn:hover {{
-                    background: #5a6fd6;
+                    background: #2563eb;
+                    transform: scale(1.05);
                 }}
                 .typing-indicator {{
                     display: flex;
