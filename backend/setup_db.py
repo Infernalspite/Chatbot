@@ -21,6 +21,7 @@ def setup():
             else:
                 _create_tables_postgres(cur)
 
+            _migrate_products_columns(cur)   # ← NEW: add locality, vendor_id, low_stock_threshold
             _seed_users(cur)
             _ensure_driver_users(cur)
             _seed_products(cur)
@@ -49,15 +50,18 @@ def _create_tables_mysql(cur):
     """)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS products (
-            id           INT AUTO_INCREMENT PRIMARY KEY,
-            name         VARCHAR(120) NOT NULL,
-            price        DECIMAL(8,2) NOT NULL,
-            stock        INT          DEFAULT 0,
-            image_url    VARCHAR(500),
-            category     VARCHAR(120),
-            sub_category VARCHAR(120),
-            description  TEXT,
-            tags         TEXT
+            id                 INT AUTO_INCREMENT PRIMARY KEY,
+            name               VARCHAR(120) NOT NULL,
+            price              DECIMAL(8,2) NOT NULL,
+            stock              INT          DEFAULT 0,
+            image_url          VARCHAR(500),
+            category           VARCHAR(120),
+            sub_category       VARCHAR(120),
+            description        TEXT,
+            tags               TEXT,
+            locality           VARCHAR(150),
+            vendor_id          INT,
+            low_stock_threshold INT DEFAULT 10
         )
     """)
     cur.execute("""
@@ -120,15 +124,18 @@ def _create_tables_postgres(cur):
     """)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS products (
-            id           SERIAL PRIMARY KEY,
-            name         VARCHAR(120) NOT NULL,
-            price        DECIMAL(8,2) NOT NULL,
-            stock        INTEGER      DEFAULT 0,
-            image_url    VARCHAR(500),
-            category     VARCHAR(120),
-            sub_category VARCHAR(120),
-            description  TEXT,
-            tags         TEXT
+            id                  SERIAL PRIMARY KEY,
+            name                VARCHAR(120) NOT NULL,
+            price               DECIMAL(8,2) NOT NULL,
+            stock               INTEGER      DEFAULT 0,
+            image_url           VARCHAR(500),
+            category            VARCHAR(120),
+            sub_category        VARCHAR(120),
+            description         TEXT,
+            tags                TEXT,
+            locality            VARCHAR(150),
+            vendor_id           INTEGER,
+            low_stock_threshold INTEGER DEFAULT 10
         )
     """)
     cur.execute("""
@@ -171,6 +178,35 @@ def _create_tables_postgres(cur):
     print("  PostgreSQL tables ready.")
 
 
+# ── Migration: add new hyperlocal columns to existing products table ───────────
+def _migrate_products_columns(cur):
+    """Idempotently add locality, vendor_id, low_stock_threshold to products."""
+    if DB_TYPE == "mysql":
+        columns_to_add = [
+            ("locality",            "ALTER TABLE products ADD COLUMN locality VARCHAR(150)"),
+            ("vendor_id",           "ALTER TABLE products ADD COLUMN vendor_id INT"),
+            ("low_stock_threshold", "ALTER TABLE products ADD COLUMN low_stock_threshold INT DEFAULT 10"),
+        ]
+        for col_name, ddl in columns_to_add:
+            try:
+                cur.execute(ddl)
+                print(f"  MySQL: added column '{col_name}' to products.")
+            except Exception:
+                pass  # Column already exists — safe to ignore
+    else:
+        columns_to_add = [
+            ("locality",            "ALTER TABLE products ADD COLUMN IF NOT EXISTS locality VARCHAR(150)"),
+            ("vendor_id",           "ALTER TABLE products ADD COLUMN IF NOT EXISTS vendor_id INTEGER"),
+            ("low_stock_threshold", "ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER DEFAULT 10"),
+        ]
+        for col_name, ddl in columns_to_add:
+            try:
+                cur.execute(ddl)
+                print(f"  PostgreSQL: ensured column '{col_name}' in products.")
+            except Exception:
+                pass
+
+
 # ── Seed users ─────────────────────────────────────────────────────────────────
 def _seed_users(cur):
     cur.execute("SELECT COUNT(*) AS cnt FROM users")
@@ -188,6 +224,9 @@ def _seed_users(cur):
         ("Maddie",       "maddie@example.com",       "manager", "1234"),
         ("Test User",    "test_b9020b@example.com",  "user",    "my_secure_password"),
         ("deez",         "deez@gmail.com",           "user",    "deez"),
+        # Seeded vendor accounts
+        ("Ravi Vendor",  "ravi.vendor@example.com",  "vendor",  "vendor123"),
+        ("Maya Vendor",  "maya.vendor@example.com",  "vendor",  "vendor123"),
     ]
     for name, email, role, pwd in users:
         cur.execute("""
@@ -261,7 +300,12 @@ def _ensure_delivery_assignments(cur):
     print(f"  Added delivery assignments for {len(orders)} orders.")
 
 
-# ── Seed products ──────────────────────────────────────────────────────────────
+# ── Seed products (with locality for hyperlocal demo) ─────────────────────────
+LOCALITIES = [
+    "Downtown", "Midtown", "Uptown", "Westside",
+    "Eastside", "Northgate", "Southpark", "Harbor District",
+]
+
 def _seed_products(cur):
     cur.execute("SELECT COUNT(*) AS cnt FROM products")
     if cur.fetchone()["cnt"] > 0:
@@ -326,12 +370,13 @@ def _seed_products(cur):
         ("Gel Ink Pens Set",            8.50, 140, "https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=600&auto=format&fit=crop&q=80"),
         ("Adjustable Laptop Table",    39.99,  35, "https://images.unsplash.com/photo-1585776245991-cf89dd7fc73a?w=600&auto=format&fit=crop&q=80"),
     ]
-    for name, price, stock, img in products:
+    for i, (name, price, stock, img) in enumerate(products):
+        locality = LOCALITIES[i % len(LOCALITIES)]
         cur.execute("""
-            INSERT INTO products (name, price, stock, image_url)
-            VALUES (%s, %s, %s, %s)
-        """, (name, price, stock, img))
-    print(f"  Seeded {len(products)} products.")
+            INSERT INTO products (name, price, stock, image_url, locality, low_stock_threshold)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (name, price, stock, img, locality, 10))
+    print(f"  Seeded {len(products)} products with locality data.")
 
 
 if __name__ == "__main__":
