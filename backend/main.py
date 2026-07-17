@@ -48,10 +48,6 @@ from fastapi.staticfiles import StaticFiles
 os.makedirs("static/images", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# ── Serve the HTML frontend from the /frontend directory at root ─────────────
-# Must be registered AFTER all API routes — FastAPI mounts are evaluated in order.
-# We do the actual mount at the bottom of this file so API routes take priority.
-
 
 @app.on_event("startup")
 def prepare_product_ai_fields():
@@ -815,41 +811,3 @@ def get_items():
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         connection.close()
-
-
-# ── Driver: update delivery status ────────────────────────────────────────────
-from pydantic import BaseModel as _BaseModel
-
-class DeliveryStatusUpdate(_BaseModel):
-    status: str
-
-@app.put("/deliveries/{delivery_id}/status")
-def update_delivery_status(delivery_id: int = Path(...), payload: DeliveryStatusUpdate = None):
-    """Allow a driver to update their delivery status (e.g. mark as Delivered)."""
-    VALID_STATUSES = {"Preparing", "Shipped", "On the way", "Out for delivery", "Delivered"}
-    if payload.status not in VALID_STATUSES:
-        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(VALID_STATUSES)}")
-    try:
-        connection = DB_connection()
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "UPDATE deliveries SET status = %s WHERE id = %s",
-                (payload.status, delivery_id)
-            )
-            if cursor.rowcount == 0:
-                raise HTTPException(status_code=404, detail="Delivery not found")
-            connection.commit()
-            return {"message": "Delivery status updated", "delivery_id": delivery_id, "status": payload.status}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        connection.close()
-
-
-# ── Mount frontend static files LAST so all API routes take priority ──────────
-import pathlib as _pathlib
-_frontend_dir = _pathlib.Path(__file__).parent.parent / "frontend"
-if _frontend_dir.exists():
-    app.mount("/", StaticFiles(directory=str(_frontend_dir), html=True), name="frontend")
