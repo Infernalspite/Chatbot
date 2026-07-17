@@ -11,3 +11,6 @@ python-dotenv
 python-multipart
 voyageai
 psycopg2-binary
+altair>=5.0.0
+plotly>=5.0.0
+groq
