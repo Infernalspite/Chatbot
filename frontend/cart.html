@@ -201,11 +201,13 @@
             cart.splice(idx, 1);
             localStorage.setItem('cart', JSON.stringify(cart));
             renderCart();
+            updateCartBadge();
         }
 
         function clearCart() {
             localStorage.setItem('cart', '[]');
             renderCart();
+            updateCartBadge();
         }
 
         async function fetchAICartSummary() {
@@ -340,7 +342,7 @@
                         card.innerHTML = `
                             <div class="flex justify-between items-center border-b border-on-background/5 pb-1">
                                 <span class="font-bold">Order #${orderId}</span>
-                                <span class="text-on-surface-variant text-[10px]">${new Date(first.shipped_at || Date.now()).toLocaleDateString()}</span>
+                                <span class="text-on-surface-variant text-[10px]">${first.shipped_at ? new Date(first.shipped_at).toLocaleDateString() : `Order #${orderId}`}</span>
                             </div>
                             <div class="text-on-surface-variant font-medium">${itemText}</div>
                             ${deliveryInfo}
