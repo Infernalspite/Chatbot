@@ -44,9 +44,45 @@ app.add_middleware(
 )
 
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
 # Ensure static uploads directory exists
 os.makedirs("static/images", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# ── Serve static HTML/CSS/JS frontend ──────────────────────────────────────
+_FRONTEND = FilePath(__file__).parent.parent / "frontend"
+
+# Mount CSS and JS directories at their expected root paths
+if (_FRONTEND / "css").exists():
+    app.mount("/css", StaticFiles(directory=str(_FRONTEND / "css")), name="css")
+if (_FRONTEND / "js").exists():
+    app.mount("/js", StaticFiles(directory=str(_FRONTEND / "js")), name="js")
+
+
+@app.get("/healthz", include_in_schema=False)
+def healthz():
+    return {"status": "ok"}
+
+
+@app.get("/", include_in_schema=False)
+def serve_index():
+    return FileResponse(str(_FRONTEND / "index.html"))
+
+
+_HTML_PAGES = ["login", "cart", "product", "vendor", "driver", "insights"]
+
+for _page in _HTML_PAGES:
+    _path = f"/{_page}.html"
+    _file = str(_FRONTEND / f"{_page}.html")
+
+    def _make_handler(fp: str):
+        def _handler():
+            return FileResponse(fp)
+        return _handler
+
+    app.add_api_route(_path, _make_handler(_file), include_in_schema=False)
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 @app.on_event("startup")

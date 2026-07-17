@@ -1,9 +1,8 @@
 fastapi
-streamlit==1.41.1
+uvicorn[standard]
 requests
 pandas
 pymysql
-uvicorn
 aiohttp
 PyJWT
 bcrypt
@@ -14,3 +13,4 @@ psycopg2-binary
 altair>=5.0.0
 plotly>=5.0.0
 groq
+aiofiles
