@@ -23,7 +23,7 @@ def update_user_role(user_id: int = Path(...), role_update: RoleUpdate = ..., cu
                 raise HTTPException(status_code=403, detail="Admin access required")
             
             # Validate role
-            valid_roles = ["user", "manager", "admin"]
+            valid_roles = ["user", "manager", "admin", "vendor", "driver"]
             if role_update.role not in valid_roles:
                 raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(valid_roles)}")
             
@@ -102,26 +102,37 @@ def create_product(
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
 ):
-    """Create product - Manager or Admin only. Uses JWT for authentication"""
-    manager_user_id = current_user.get("id")
+    """Create product - Manager, Admin, or Vendor. Uses JWT for authentication"""
+    user_id = current_user.get("id")
     try:
-        # Check if user is manager or admin
         connection = DB_connection()
         with connection.cursor() as cursor:
             check_sql = "SELECT role FROM users WHERE id = %s"
-            cursor.execute(check_sql, (manager_user_id,))
+            cursor.execute(check_sql, (user_id,))
             user_result = cursor.fetchone()
             
-            if not user_result or user_result.get('role') not in ['manager', 'admin']:
-                raise HTTPException(status_code=403, detail="Manager or Admin access required")
+            if not user_result or user_result.get('role') not in ['manager', 'admin', 'vendor']:
+                raise HTTPException(status_code=403, detail="Manager, Admin, or Vendor access required")
+            
+            # For vendors, force vendor_id to be current user id
+            role = user_result.get('role')
+            vendor_id = user_id if role == 'vendor' else product.vendor_id
             
             if DB_TYPE == "mysql":
-                cursor.execute("INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s)",
-                               (product.name, product.price, product.stock, product.image_url))
+                cursor.execute(
+                    """INSERT INTO products (name, price, stock, image_url, locality, vendor_id, low_stock_threshold)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                    (product.name, product.price, product.stock, product.image_url,
+                     product.locality, vendor_id, product.low_stock_threshold or 10)
+                )
                 product_id = cursor.lastrowid
             else:
-                cursor.execute("INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s) RETURNING id",
-                               (product.name, product.price, product.stock, product.image_url))
+                cursor.execute(
+                    """INSERT INTO products (name, price, stock, image_url, locality, vendor_id, low_stock_threshold)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+                    (product.name, product.price, product.stock, product.image_url,
+                     product.locality, vendor_id, product.low_stock_threshold or 10)
+                )
                 product_id = cursor.fetchone()["id"]
             connection.commit()
             background_tasks.add_task(classify_and_update_product, product_id)
@@ -141,27 +152,37 @@ def update_product(
     background_tasks: BackgroundTasks = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Update product - Manager or Admin only. Uses JWT for authentication"""
-    manager_user_id = current_user.get("id")
+    """Update product - Manager, Admin, or owner Vendor. Uses JWT for authentication"""
+    user_id = current_user.get("id")
     try:
-        # Check if user is manager or admin
         connection = DB_connection()
         with connection.cursor() as cursor:
             check_sql = "SELECT role FROM users WHERE id = %s"
-            cursor.execute(check_sql, (manager_user_id,))
+            cursor.execute(check_sql, (user_id,))
             user_result = cursor.fetchone()
             
-            if not user_result or user_result.get('role') not in ['manager', 'admin']:
-                raise HTTPException(status_code=403, detail="Manager or Admin access required")
+            if not user_result or user_result.get('role') not in ['manager', 'admin', 'vendor']:
+                raise HTTPException(status_code=403, detail="Manager, Admin, or Vendor access required")
             
-            # Check if product exists
-            check_product_sql = "SELECT id FROM products WHERE id = %s"
+            role = user_result.get('role')
+            
+            # Check if product exists and get its vendor_id
+            check_product_sql = "SELECT vendor_id FROM products WHERE id = %s"
             cursor.execute(check_product_sql, (product_id,))
-            if not cursor.fetchone():
+            prod = cursor.fetchone()
+            if not prod:
                 raise HTTPException(status_code=404, detail="Product not found")
             
-            sql = "UPDATE products SET name = %s, price = %s, stock = %s, image_url = %s WHERE id = %s"
-            cursor.execute(sql, (product.name, product.price, product.stock, product.image_url, product_id))
+            # Ownership check for vendor role
+            if role == 'vendor' and prod.get('vendor_id') != user_id:
+                raise HTTPException(status_code=403, detail="Unauthorized: You do not own this product")
+            
+            sql = """UPDATE products 
+                     SET name = %s, price = %s, stock = %s, image_url = %s,
+                         locality = %s, low_stock_threshold = %s
+                     WHERE id = %s"""
+            cursor.execute(sql, (product.name, product.price, product.stock, product.image_url,
+                                 product.locality, product.low_stock_threshold or 10, product_id))
             connection.commit()
             if background_tasks:
                 background_tasks.add_task(classify_and_update_product, product_id)
@@ -176,24 +197,30 @@ def update_product(
 
 @router.delete("/products/{product_id}")
 def delete_product(product_id: int = Path(...), current_user: dict = Depends(get_current_user)):
-    """Delete product - Manager or Admin only. Uses JWT for authentication"""
-    manager_user_id = current_user.get("id")
+    """Delete product - Manager, Admin, or owner Vendor. Uses JWT for authentication"""
+    user_id = current_user.get("id")
     try:
-        # Check if user is manager or admin
         connection = DB_connection()
         with connection.cursor() as cursor:
             check_sql = "SELECT role FROM users WHERE id = %s"
-            cursor.execute(check_sql, (manager_user_id,))
+            cursor.execute(check_sql, (user_id,))
             user_result = cursor.fetchone()
             
-            if not user_result or user_result.get('role') not in ['manager', 'admin']:
-                raise HTTPException(status_code=403, detail="Manager or Admin access required")
+            if not user_result or user_result.get('role') not in ['manager', 'admin', 'vendor']:
+                raise HTTPException(status_code=403, detail="Manager, Admin, or Vendor access required")
+            
+            role = user_result.get('role')
             
             # Check if product exists
-            check_product_sql = "SELECT id FROM products WHERE id = %s"
+            check_product_sql = "SELECT vendor_id FROM products WHERE id = %s"
             cursor.execute(check_product_sql, (product_id,))
-            if not cursor.fetchone():
+            prod = cursor.fetchone()
+            if not prod:
                 raise HTTPException(status_code=404, detail="Product not found")
+            
+            # Ownership check for vendor role
+            if role == 'vendor' and prod.get('vendor_id') != user_id:
+                raise HTTPException(status_code=403, detail="Unauthorized: You do not own this product")
             
             sql = "DELETE FROM products WHERE id = %s"
             cursor.execute(sql, (product_id,))
