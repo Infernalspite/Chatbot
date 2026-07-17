@@ -226,7 +226,7 @@ def login(credentials: LoginRequest):
     try:
         connection = DB_connection()
         with connection.cursor() as cursor:
-            username = credentials.username.strip()
+            username = credentials.email.strip()
             sql = """
                 SELECT id, name, email, role, password
                 FROM users
