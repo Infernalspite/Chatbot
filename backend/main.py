@@ -362,6 +362,31 @@ def get_localities():
         connection.close()
 
 
+@app.get("/products/{product_id}")
+def get_product_by_id(product_id: int = Path(...)):
+    """Return a single product by ID."""
+    try:
+        connection = DB_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT p.*, u.name AS vendor_name
+                   FROM products p
+                   LEFT JOIN users u ON p.vendor_id = u.id
+                   WHERE p.id = %s""",
+                (product_id,)
+            )
+            product = cursor.fetchone()
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        return product
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        connection.close()
+
+
 @app.post("/api/products")
 def create_product_api(product: Product, background_tasks: BackgroundTasks):
     connection = None

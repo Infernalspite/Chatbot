@@ -119,3 +119,37 @@ h1, h2, h3, h4, h5, h6 {
         grid-template-columns: 1fr;
     }
 }
+
+/* ── Spacing tokens (fallback for Tailwind custom spacing) ──────────────── */
+.py-stack-xs  { padding-top:  4px; padding-bottom:  4px; }
+.py-stack-sm  { padding-top:  8px; padding-bottom:  8px; }
+.py-stack-md  { padding-top: 12px; padding-bottom: 12px; }
+.py-stack-lg  { padding-top: 24px; padding-bottom: 24px; }
+.py-stack-xl  { padding-top: 40px; padding-bottom: 40px; }
+
+.px-margin-mobile  { padding-left: 16px; padding-right: 16px; }
+.px-margin-desktop { padding-left: 48px; padding-right: 48px; }
+.p-margin-mobile   { padding: 16px; }
+.p-margin-desktop  { padding: 48px; }
+
+.mb-stack-sm  { margin-bottom:  8px; }
+.mb-stack-md  { margin-bottom: 12px; }
+.mb-stack-lg  { margin-bottom: 24px; }
+.mb-stack-xl  { margin-bottom: 40px; }
+
+.gap-stack-sm { gap:  8px; }
+.gap-stack-md { gap: 12px; }
+.gap-stack-lg { gap: 24px; }
+
+/* ── Typography tokens ─────────────────────────────────────────────────── */
+.font-display-lg    { font-family: 'Georgia', serif; font-style: italic; font-weight: 700; }
+.font-body-base     { font-family: 'Inter', sans-serif; }
+.text-display-lg-mobile { font-size: 1.75rem; line-height: 2rem; }
+.text-display-lg        { font-size: 2.5rem;  line-height: 2.75rem; }
+
+/* ── Responsive desktop spacing (applied via media query) ───────────────── */
+@media (min-width: 768px) {
+  .md\:px-margin-desktop { padding-left: 48px; padding-right: 48px; }
+  .md\:p-margin-desktop  { padding: 48px; }
+  .md\:text-display-lg   { font-size: 2.5rem; line-height: 2.75rem; }
+}
