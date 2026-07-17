@@ -116,7 +116,7 @@
     floatBtn.className = 'fixed bottom-20 md:bottom-8 right-6 md:right-8 w-14 h-14 bg-[#c1502e] text-white border-2 border-[#1c1b19] shadow-[4px_4px_0px_0px_rgba(28,27,25,1)] transition-all z-[999] flex items-center justify-center hover:rotate-3 active:translate-x-1 active:translate-y-1 active:shadow-none';
     floatBtn.style.transform = 'rotate(-2deg)';
     floatBtn.innerHTML = `<span class="material-symbols-outlined text-3xl">forum</span>`;
-    floatBtn.onclick = toggleChatbot;
+    floatBtn.onclick = function() { if (window.toggleChatbot) window.toggleChatbot(); };
     document.body.appendChild(floatBtn);
 
     const chatbotMessages = document.getElementById('chatbot-messages');
@@ -210,7 +210,7 @@
                 })
             });
 
-            document.getElementById('chatbot-loading').remove();
+            document.getElementById('chatbot-loading')?.remove();
 
             if (response.ok) {
                 const data = await response.json();

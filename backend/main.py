@@ -1,9 +1,7 @@
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Path, Query, Depends, Header, File, UploadFile
+from fastapi import BackgroundTasks, Body, FastAPI, HTTPException, Path, Query, Depends, Header, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from schema import User, Product, ProductFilterRequest, Order, OrderItem, ItemData, RoleUpdate, LoginRequest
 from typing import List, Optional
-import pymysql
-import pymysql.cursors
 import os
 import json
 import re
@@ -37,8 +35,7 @@ from product_classifier import (
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -835,7 +832,7 @@ def update_order(order_id: int, payload: Order):
 
 
 @app.put("/deliveries/{delivery_id}/status")
-def update_delivery_status(delivery_id: int = Path(...), body: dict = {}):
+def update_delivery_status(delivery_id: int = Path(...), body: dict = Body(default={})):
     """Driver updates delivery status (e.g. mark as Delivered)."""
     new_status = (body or {}).get("status", "Delivered")
     try:

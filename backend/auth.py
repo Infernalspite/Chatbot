@@ -3,7 +3,8 @@ import jwt
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-SECRET_KEY = "your-curated-jwt-secret-key-12345!@"
+import os
+SECRET_KEY = os.getenv("JWT_SECRET", "your-curated-jwt-secret-key-12345!@")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 hours for testing/dev convenience
 

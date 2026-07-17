@@ -26,6 +26,8 @@ class ProductFilterRequest(BaseModel):
     max_price: Optional[float] = None
     search: Optional[str] = None
     locality: Optional[str] = None
+    query: Optional[str] = None
+    sort_by: Optional[str] = None
 
 
 class Order(BaseModel):
@@ -39,7 +41,9 @@ class OrderItem(BaseModel):
 
 
 class ItemData(BaseModel):
-    items: List[dict]
+    id: int
+    title: str
+    description: str
 
 
 class RoleUpdate(BaseModel):
