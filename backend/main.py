@@ -657,7 +657,7 @@ def upload_image(file: UploadFile = File(...)):
             shutil.copyfileobj(file.file, buffer)
         
         # Return the static URL
-        url = f"http://localhost:8000/static/images/{unique_filename}"
+        url = f"/static/images/{unique_filename}"
         return {"image_url": url}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
@@ -827,6 +827,31 @@ def update_order(order_id: int, payload: Order):
             
             connection.commit()
             return {"message": "Order updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        connection.close()
+
+
+
+@app.put("/deliveries/{delivery_id}/status")
+def update_delivery_status(delivery_id: int = Path(...), body: dict = {}):
+    """Driver updates delivery status (e.g. mark as Delivered)."""
+    new_status = (body or {}).get("status", "Delivered")
+    try:
+        connection = DB_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT id FROM deliveries WHERE id = %s", (delivery_id,))
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Delivery not found")
+            cursor.execute(
+                "UPDATE deliveries SET status = %s WHERE id = %s",
+                (new_status, delivery_id),
+            )
+            connection.commit()
+        return {"message": f"Delivery {delivery_id} updated to '{new_status}'"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:

@@ -245,8 +245,9 @@
                     // Refresh the whole list to show updated state
                     await fetchDeliveries();
                 } else {
-                    const err = await response.json();
-                    alert(`❌ Update failed: ${err.detail || 'Server error'}`);
+                    let errMsg = 'Server error';
+                    try { const errData = await response.json(); errMsg = errData.detail || errMsg; } catch(_) {}
+                    alert(`❌ Update failed: ${errMsg}`);
                     btn.disabled = false;
                     btn.textContent = '✓ MARK AS DELIVERED';
                 }
