@@ -44,8 +44,8 @@
 
             <div class="space-y-4">
                 <div>
-                    <label for="username" class="font-caps text-[10px] text-on-surface-variant block mb-1">USERNAME</label>
-                    <input type="text" id="username" placeholder="e.g. John Doe" class="notepad-line w-full text-sm">
+                    <label for="username" class="font-caps text-[10px] text-on-surface-variant block mb-1">EMAIL</label>
+                    <input type="text" id="username" placeholder="e.g. john@example.com" class="notepad-line w-full text-sm">
                 </div>
                 <div>
                     <label for="password" class="font-caps text-[10px] text-on-surface-variant block mb-1">PASSWORD</label>
@@ -147,7 +147,7 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        username: usernameInput,
+                        email: usernameInput,
                         password: passwordInput
                     })
                 });
@@ -184,7 +184,7 @@
                     }
                 } else {
                     const errorDetail = await response.json();
-                    errorDiv.textContent = `❌ Error: ${errorDetail.detail || 'Credentials invalid.'}`;
+                    const det = errorDetail.detail; errorDiv.textContent = `❌ Error: ${Array.isArray(det) ? det.map(d=>d.msg||JSON.stringify(d)).join(", ") : (det || "Credentials invalid.")}`;
                     errorDiv.classList.remove('hidden');
                 }
             } catch (err) {
@@ -233,7 +233,7 @@
                     }, 2000);
                 } else {
                     const errDetail = await response.json();
-                    errorDiv.textContent = `❌ Error: ${errDetail.detail || 'Failed to create resident.'}`;
+                    const det2 = errDetail.detail; errorDiv.textContent = `❌ Error: ${Array.isArray(det2) ? det2.map(d=>d.msg||JSON.stringify(d)).join(", ") : (det2 || "Failed to create resident.")}`;
                     errorDiv.classList.remove('hidden');
                 }
             } catch (err) {
