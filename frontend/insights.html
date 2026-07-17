@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Nearby | Ledger Insights</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Georgia:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="/css/style.css" rel="stylesheet">
+</head>
+<body class="bg-background text-on-background font-body-base overflow-x-hidden min-h-screen">
+
+    <!-- Top sticky AppBar -->
+    <header class="w-full top-0 sticky z-40 bg-background border-b-2 border-on-background shadow-[4px_4px_0px_0px_rgba(28,27,25,1)]">
+        <div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop py-stack-md max-w-[1200px] mx-auto">
+            <div class="flex items-center gap-4">
+                <button class="hover:bg-primary-fixed-dim transition-all p-2 active:translate-x-1 active:translate-y-1 active:shadow-none">
+                    <span class="material-symbols-outlined text-primary">insights</span>
+                </button>
+                <h1 class="font-display-lg text-display-lg-mobile text-primary uppercase tracking-tight" onclick="window.location.reload()" style="cursor:pointer">Nearby Insights</h1>
+            </div>
+            
+            <div class="flex items-center gap-6">
+                <nav class="hidden md:flex gap-8">
+                    <script>
+                        // Conditional nav links
+                        const userObj = JSON.parse(localStorage.getItem('currentUser') || '{}');
+                        if (userObj.role === 'vendor') {
+                            document.write('<a class="font-caps text-xs text-on-surface-variant hover:text-primary transition-colors" href="/vendor.html">Inventory</a>');
+                        }
+                    </script>
+                    <a class="font-caps text-xs text-primary hover:underline" href="/insights.html">Insights</a>
+                    <a class="font-caps text-xs text-on-surface-variant hover:text-primary transition-colors" href="/login.html" onclick="logoutUser(event)">Logout</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1200px] mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg relative z-10">
+        
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-stack-md border-b-2 border-on-background pb-6 mb-8">
+            <div>
+                <span class="font-caps text-[9px] text-primary block mb-1">LEDGER METRIC ENGINE</span>
+                <h1 class="font-display-lg text-4xl text-on-background leading-none">Marketplace Insights</h1>
+            </div>
+            <div>
+                <button onclick="fetchAnalytics()" class="bg-surface border-2 border-on-background hard-shadow px-4 py-2 font-caps text-xs">🔄 REFRESH LEDGER DATA</button>
+            </div>
+        </div>
+
+        <!-- Metric grid -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8" id="metric-cards">
+            <div class="double-rule bg-primary text-white p-5 hard-shadow">
+                <span class="font-caps text-[9px] opacity-85 block mb-1">Gross Revenue</span>
+                <span class="font-display-lg text-2xl" id="metric-revenue">$0.00</span>
+            </div>
+            <div class="double-rule bg-surface p-5 hard-shadow">
+                <span class="font-caps text-[9px] text-on-surface-variant block mb-1">Total Orders</span>
+                <span class="font-display-lg text-2xl text-on-background" id="metric-orders">0</span>
+            </div>
+            <div class="double-rule bg-surface p-5 hard-shadow">
+                <span class="font-caps text-[9px] text-on-surface-variant block mb-1">Active Deliveries</span>
+                <span class="font-display-lg text-2xl text-on-background" id="metric-active">0</span>
+            </div>
+            <div class="double-rule bg-surface p-5 hard-shadow">
+                <span class="font-caps text-[9px] text-on-surface-variant block mb-1">Completed Deliveries</span>
+                <span class="font-display-lg text-2xl text-on-background" id="metric-completed">0</span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- Top products table (8 columns) -->
+            <div class="lg:col-span-8 bg-surface border-2 border-on-background hard-shadow overflow-hidden">
+                <div class="p-4 bg-[#ceeace]/20 border-b-2 border-on-background">
+                    <h3 class="font-display-lg text-lg text-secondary">Top Products by Revenue</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-surface-container-high border-b-2 border-on-background">
+                                <th class="p-4 font-caps text-[9px] text-on-surface-variant">Product Name</th>
+                                <th class="p-4 font-caps text-[9px] text-on-surface-variant text-center">Units Sold</th>
+                                <th class="p-4 font-caps text-[9px] text-on-surface-variant text-right">Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y-2 divide-on-background/5" id="top-products-list">
+                            <!-- Loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Pipeline + Alerts (4 columns) -->
+            <div class="lg:col-span-4 space-y-6">
+                <!-- Delivery pipeline -->
+                <div class="double-rule bg-surface p-5 hard-shadow">
+                    <h3 class="font-display-lg text-md mb-4 italic">Delivery Status Pipeline</h3>
+                    <div id="pipeline-list" class="space-y-3">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- Low Stock warnings -->
+                <div class="double-rule border-error bg-[#ffdad6]/20 p-5 hard-shadow">
+                    <h3 class="font-display-lg text-md text-error mb-4 italic">Low-Stock Registry Alerts</h3>
+                    <div id="low-stock-list" class="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Floating Chatbot script -->
+    <script src="/js/chatbot.js"></script>
+
+    <script>
+        // Check authentication & role (admin, manager, vendor allowed)
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+        if (!currentUser || !['admin', 'manager', 'vendor'].includes(currentUser.role)) {
+            window.location.href = '/login.html';
+        }
+
+        function logoutUser(e) {
+            e.preventDefault();
+            localStorage.removeItem('currentUser');
+            sessionStorage.removeItem('chatbot_history');
+            window.location.href = '/login.html';
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchAnalytics();
+        });
+
+        async function fetchAnalytics() {
+            try {
+                const response = await fetch('/admin/analytics');
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Render metric cards
+                    document.getElementById('metric-revenue').textContent = `$${parseFloat(data.gross_revenue || 0).toFixed(2)}`;
+                    document.getElementById('metric-orders').textContent = data.total_orders || 0;
+                    document.getElementById('metric-active').textContent = data.active_orders || 0;
+                    document.getElementById('metric-completed').textContent = data.completed_orders || 0;
+
+                    // Render top products
+                    const topList = document.getElementById('top-products-list');
+                    topList.innerHTML = '';
+                    const topProducts = data.top_products || [];
+                    if (topProducts.length === 0) {
+                        topList.innerHTML = `<tr><td colspan="3" class="p-6 text-center italic text-on-surface-variant">No sales recorded.</td></tr>`;
+                    } else {
+                        topProducts.forEach(p => {
+                            const tr = document.createElement('tr');
+                            tr.className = "hover:bg-primary-fixed-dim/5 transition-colors";
+                            tr.innerHTML = `
+                                <td class="p-4 font-bold text-sm">${p.name}</td>
+                                <td class="p-4 text-center font-semibold text-sm">${p.units_sold}</td>
+                                <td class="p-4 text-right font-bold text-sm text-[#c1502e]">$${parseFloat(p.revenue).toFixed(2)}</td>
+                            `;
+                            topList.appendChild(tr);
+                        });
+                    }
+
+                    // Render pipeline
+                    const pipeList = document.getElementById('pipeline-list');
+                    pipeList.innerHTML = '';
+                    const pipeline = data.pipeline || [];
+                    if (pipeline.length === 0) {
+                        pipeList.innerHTML = `<p class="text-xs text-on-surface-variant italic">No deliveries logged.</p>`;
+                    } else {
+                        pipeline.forEach(item => {
+                            const row = document.createElement('div');
+                            row.className = "flex justify-between items-center text-xs p-2 bg-[#f7f3ec] border border-on-background/5";
+                            row.innerHTML = `
+                                <span class="font-caps text-[10px] font-bold">${item.status}</span>
+                                <span class="bg-[#1c1b19] text-white px-2 py-0.5 font-bold">${item.count} orders</span>
+                            `;
+                            pipeList.appendChild(row);
+                        });
+                    }
+
+                    // Render low-stock alerts
+                    const stockList = document.getElementById('low-stock-list');
+                    stockList.innerHTML = '';
+                    const alerts = data.low_stock_alerts || [];
+                    if (alerts.length === 0) {
+                        stockList.innerHTML = `<p class="text-xs text-[#3e5641] font-semibold">✅ All product inventory levels are healthy!</p>`;
+                    } else {
+                        alerts.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = "bg-surface border border-error p-3 text-xs";
+                            div.innerHTML = `
+                                <div class="flex justify-between items-center mb-1">
+                                    <strong>${item.name}</strong>
+                                    <span class="text-error font-bold">${item.stock} left</span>
+                                </div>
+                                <div class="text-[10px] text-on-surface-variant">District: ${item.locality || 'N/A'} | Threshold: ${item.threshold || 10}</div>
+                            `;
+                            stockList.appendChild(div);
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error("Analytics failure", err);
+            }
+        }
+    </script>
+</body>
+</html>

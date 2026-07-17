@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Nearby | The Hyperlocal Marketplace</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Georgia:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="/css/style.css" rel="stylesheet">
+</head>
+<body class="bg-background text-on-background font-body-base antialiased">
+
+    <!-- Top sticky AppBar -->
+    <header class="w-full top-0 sticky z-40 bg-background border-b-2 border-on-background shadow-[4px_4px_0px_0px_rgba(28,27,25,1)]">
+        <div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop py-stack-md max-w-[1200px] mx-auto">
+            <div class="flex items-center gap-4">
+                <button class="hover:bg-primary-fixed-dim transition-all p-2 active:translate-x-1 active:translate-y-1 active:shadow-none">
+                    <span class="material-symbols-outlined text-primary">menu</span>
+                </button>
+                <h1 class="font-display-lg text-display-lg-mobile text-primary uppercase tracking-tight" onclick="window.location.reload()" style="cursor:pointer">Nearby</h1>
+            </div>
+            
+            <div class="flex items-center gap-6">
+                <nav class="hidden md:flex gap-8">
+                    <a class="font-caps text-xs text-primary hover:underline" href="/index.html">Market</a>
+                    <a class="font-caps text-xs text-on-surface-variant hover:text-primary transition-colors" href="/cart.html">Cart</a>
+                    <a class="font-caps text-xs text-on-surface-variant hover:text-primary transition-colors" href="/login.html" onclick="logoutUser(event)">Logout</a>
+                </nav>
+                <a href="/cart.html" class="hover:bg-primary-fixed-dim transition-all p-2 active:translate-x-1 active:translate-y-1 active:shadow-none relative">
+                    <span class="material-symbols-outlined text-primary">shopping_bag</span>
+                    <span class="absolute -top-1 -right-1 bg-primary text-white text-[10px] w-5 h-5 flex items-center justify-center font-bold border-2 border-on-background" id="cart-badge-count">0</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="relative">
+        <div class="max-w-[1200px] mx-auto main-layout">
+            
+            <!-- Side Navigation category rail -->
+            <aside class="hidden md:flex flex-col border-r-2 border-on-background py-stack-lg pr-margin-mobile h-screen sticky top-[80px] justify-between">
+                <div class="mb-stack-lg">
+                    <h2 class="font-caps text-[10px] text-on-surface-variant mb-4 px-2">CATEGORIES</h2>
+                    <nav class="space-y-2" id="category-rail">
+                        <button onclick="filterCategory('All')" id="cat-All" class="w-full flex items-center gap-3 p-3 font-semibold bg-primary text-white border-2 border-on-background hard-shadow transition-all text-left">
+                            <span class="material-symbols-outlined">category</span>
+                            All Listings
+                        </button>
+                        <button onclick="filterCategory('Electronics')" id="cat-Electronics" class="w-full flex items-center gap-3 p-3 font-semibold text-on-surface-variant hover:bg-surface-container-highest transition-all border-2 border-transparent text-left">
+                            <span class="material-symbols-outlined">devices</span>
+                            Electronics
+                        </button>
+                        <button onclick="filterCategory('Furniture')" id="cat-Furniture" class="w-full flex items-center gap-3 p-3 font-semibold text-on-surface-variant hover:bg-surface-container-highest transition-all border-2 border-transparent text-left">
+                            <span class="material-symbols-outlined">chair</span>
+                            Furniture
+                        </button>
+                        <button onclick="filterCategory('Cosmetics')" id="cat-Cosmetics" class="w-full flex items-center gap-3 p-3 font-semibold text-on-surface-variant hover:bg-surface-container-highest transition-all border-2 border-transparent text-left">
+                            <span class="material-symbols-outlined">face</span>
+                            Cosmetics
+                        </button>
+                        <button onclick="filterCategory('Other')" id="cat-Other" class="w-full flex items-center gap-3 p-3 font-semibold text-on-surface-variant hover:bg-surface-container-highest transition-all border-2 border-transparent text-left">
+                            <span class="material-symbols-outlined">more_horiz</span>
+                            Other
+                        </button>
+                    </nav>
+                </div>
+                
+                <!-- Resident/Keeper Profile panel -->
+                <div class="p-4 bg-surface-container-low border-2 border-on-background hard-shadow mb-32" id="sidebar-keeper-profile">
+                    <!-- Loaded dynamically from storage -->
+                </div>
+            </aside>
+
+            <!-- Product Grid Content -->
+            <section class="p-margin-mobile md:p-margin-desktop pb-32">
+                
+                <!-- Flash banner -->
+                <div class="bg-primary text-white p-3 border-2 border-on-background hard-shadow flex justify-between items-center mb-8 rotate-[-0.5deg]">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined">bolt</span>
+                        <span class="text-xs font-bold font-caps">HYPERLOCAL LEDGER FLASH: 10% OFF ON SELECTED DISTRICT LISTINGS</span>
+                    </div>
+                </div>
+
+                <!-- Filters panel -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div>
+                        <label class="font-caps text-[9px] text-on-surface-variant block mb-1">SEARCH & AI INQUIRY</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="search-input" placeholder="e.g. fresh bread, devices" class="notepad-line w-full text-sm">
+                            <button onclick="fetchStorefrontProducts()" class="bg-[#1c1b19] text-white px-3 py-1 text-xs font-caps">Search</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="font-caps text-[9px] text-on-surface-variant block mb-1">LOCATION DISTRICT</label>
+                        <select id="locality-select" onchange="fetchStorefrontProducts()" class="notepad-line w-full text-sm">
+                            <option value="All Localities">All Localities</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="font-caps text-[9px] text-on-surface-variant block mb-1">SORTING ORDER</label>
+                        <select id="sort-select" onchange="fetchStorefrontProducts()" class="notepad-line w-full text-sm">
+                            <option value="ai">AI best match</option>
+                            <option value="name_asc">Name A-Z</option>
+                            <option value="price_low">Price low-high</option>
+                            <option value="price_high">Price high-low</option>
+                            <option value="stock_high">Most stock</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <label class="font-caps text-[9px] text-on-surface-variant block mb-1">PRICE THRESHOLD ($)</label>
+                    <div class="flex items-center gap-4">
+                        <input type="range" id="price-slider" min="0" max="500" value="500" oninput="updatePriceLabel(this.value)" onchange="fetchStorefrontProducts()" class="w-full accent-primary">
+                        <span id="price-label" class="font-bold text-sm w-12 text-right">$500</span>
+                    </div>
+                </div>
+
+                <!-- Page Headline -->
+                <div class="mb-stack-lg">
+                    <h2 class="font-display-lg text-display-lg-mobile md:text-display-lg text-on-background border-b-4 border-primary inline-block mb-2 italic">Fresh from the Ledger</h2>
+                    <p class="text-on-surface-variant max-w-lg text-sm">Sourced from neighborhood residents and micro-merchants. Scroll below for active listings.</p>
+                </div>
+
+                <!-- Product Catalog container -->
+                <div id="product-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Loaded dynamically -->
+                </div>
+
+                <!-- Recommendations Section -->
+                <div id="recommendations-container" class="mt-16 pt-8 border-t-2 border-on-background/10 hidden">
+                    <h3 class="font-display-lg text-2xl mb-6 italic">You Might Also Like</h3>
+                    <div id="recommendations-list" class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation on Mobile -->
+    <nav class="md:hidden fixed bottom-0 left-0 w-full h-16 flex justify-around items-center bg-background border-t-2 border-on-background z-50">
+        <a class="flex flex-col items-center justify-center bg-primary text-white border-t-2 border-on-background -mt-0.5 px-4 h-full" href="/index.html">
+            <span class="material-symbols-outlined">storefront</span>
+            <span class="font-caps text-[9px]">MARKET</span>
+        </a>
+        <a class="flex flex-col items-center justify-center text-on-surface-variant py-2 px-4 h-full" href="/cart.html">
+            <span class="material-symbols-outlined">shopping_bag</span>
+            <span class="font-caps text-[9px]">CART</span>
+        </a>
+        <a class="flex flex-col items-center justify-center text-on-surface-variant py-2 px-4 h-full" href="/login.html" onclick="logoutUser(event)">
+            <span class="material-symbols-outlined">logout</span>
+            <span class="font-caps text-[9px]">LOGOUT</span>
+        </a>
+    </nav>
+
+    <!-- Floating Chatbot script -->
+    <script src="/js/chatbot.js"></script>
+
+    <script>
+        let selectedCategory = 'All';
+
+        // Check authentication
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+        if (!currentUser) {
+            window.location.href = '/login.html';
+        }
+
+        function logoutUser(e) {
+            e.preventDefault();
+            localStorage.removeItem('currentUser');
+            sessionStorage.removeItem('chatbot_history');
+            window.location.href = '/login.html';
+        }
+
+        function updatePriceLabel(val) {
+            document.getElementById('price-label').textContent = `$${val}`;
+        }
+
+        // Initialize components
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchLocalities();
+            fetchStorefrontProducts();
+            updateCartBadge();
+        });
+
+        async function fetchLocalities() {
+            try {
+                const response = await fetch('/products/localities');
+                if (response.ok) {
+                    const list = await response.json();
+                    const select = document.getElementById('locality-select');
+                    list.forEach(loc => {
+                        const opt = document.createElement('option');
+                        opt.value = loc;
+                        opt.textContent = loc;
+                        select.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                console.error("Localities error", err);
+            }
+        }
+
+        function filterCategory(cat) {
+            const categories = ['All', 'Electronics', 'Furniture', 'Cosmetics', 'Other'];
+            categories.forEach(c => {
+                const btn = document.getElementById(`cat-${c}`);
+                if (c === cat) {
+                    btn.className = "w-full flex items-center gap-3 p-3 font-semibold bg-primary text-white border-2 border-on-background hard-shadow transition-all text-left";
+                } else {
+                    btn.className = "w-full flex items-center gap-3 p-3 font-semibold text-on-surface-variant hover:bg-surface-container-highest transition-all border-2 border-transparent text-left";
+                }
+            });
+            selectedCategory = cat;
+            fetchStorefrontProducts();
+        }
+
+        async function fetchStorefrontProducts() {
+            const searchQuery = document.getElementById('search-input').value.trim();
+            const locality = document.getElementById('locality-select').value;
+            const sortBy = document.getElementById('sort-select').value;
+            const maxPrice = parseFloat(document.getElementById('price-slider').value);
+            
+            const productList = document.getElementById('product-list');
+            productList.innerHTML = `<div class="col-span-3 text-center py-12 italic text-on-surface-variant">Syncing local inventory registry...</div>`;
+
+            try {
+                const response = await fetch('/api/products/filter', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: searchQuery || null,
+                        category: selectedCategory === 'All' ? null : selectedCategory,
+                        sort_by: sortBy,
+                        locality: locality === 'All Localities' ? null : locality
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const grouped = data.grouped || {};
+                    productList.innerHTML = '';
+
+                    let productCount = 0;
+                    const activeCategories = selectedCategory === 'All' ? ['Electronics', 'Furniture', 'Cosmetics', 'Other'] : [selectedCategory];
+                    
+                    activeCategories.forEach(cat => {
+                        const items = grouped[cat] || [];
+                        const filteredItems = items.filter(p => parseFloat(p.price) <= maxPrice);
+
+                        if (filteredItems.length > 0) {
+                            // Section header for category
+                            const catHeader = document.createElement('div');
+                            catHeader.className = "col-span-1 md:col-span-2 lg:col-span-3 border-b-2 border-on-background pt-6 pb-2 mb-2";
+                            catHeader.innerHTML = `<h3 class="font-serif text-xl italic text-primary">${cat}</h3>`;
+                            productList.appendChild(catHeader);
+
+                            filteredItems.forEach(p => {
+                                productCount++;
+                                const card = document.createElement('div');
+                                card.className = "bg-surface border-2 border-on-background hard-shadow p-4 flex flex-col justify-between hover:translate-y-[-2px] transition-all";
+                                
+                                const imgUrl = p.image_url || "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500&auto=format&fit=crop&q=80";
+                                
+                                let stockBadge = '';
+                                const stock = parseInt(p.stock || 0);
+                                const threshold = parseInt(p.low_stock_threshold || 10);
+                                if (stock <= 0) {
+                                    stockBadge = `<span class="px-2 py-0.5 text-[9px] font-caps bg-error text-white">Out of Stock</span>`;
+                                } else if (stock <= threshold) {
+                                    stockBadge = `<span class="px-2 py-0.5 text-[9px] font-caps bg-primary text-white animate-pulse">Low Stock (${stock})</span>`;
+                                } else {
+                                    stockBadge = `<span class="px-2 py-0.5 text-[9px] font-caps bg-[#ceeace] text-[#09200f]">In Stock (${stock})</span>`;
+                                }
+
+                                card.innerHTML = `
+                                    <div>
+                                        <a href="/product.html?id=${p.id}">
+                                            <div class="h-48 overflow-hidden border border-on-background mb-4 bg-surface-container-low">
+                                                <img src="${imgUrl}" alt="${p.name}" class="w-full h-full object-cover hover:scale-105 transition-all">
+                                            </div>
+                                        </a>
+                                        <div class="flex justify-between items-start mb-2">
+                                            <a href="/product.html?id=${p.id}">
+                                                <h4 class="font-serif font-bold text-md hover:text-primary transition-colors">${p.name}</h4>
+                                            </a>
+                                            <span class="font-bold text-md text-[#c1502e]">$${parseFloat(p.price).toFixed(2)}</span>
+                                        </div>
+                                        <p class="text-xs text-on-surface-variant mb-4 italic max-w-prose line-clamp-2">${p.description || 'No ledger description provided.'}</p>
+                                    </div>
+                                    <div>
+                                        <div class="flex justify-between items-center gap-2 border-t border-on-background/10 pt-3 mt-2">
+                                            <span class="text-[10px] font-caps text-on-surface-variant">📍 ${p.locality || 'Global'}</span>
+                                            ${stockBadge}
+                                        </div>
+                                        <button onclick="addToCart('${p.id}', '${p.name.replace(/'/g, "\\'")}', ${p.price})" class="w-full bg-primary text-white border border-[#1c1b19] font-caps text-[10px] py-2 mt-4 hover:bg-primary/95 active:translate-y-[1px]" ${stock <= 0 ? 'disabled' : ''}>
+                                            ADD TO LEDGER
+                                        </button>
+                                    </div>
+                                `;
+                                productList.appendChild(card);
+                            });
+                        }
+                    });
+
+                    if (productCount === 0) {
+                        productList.innerHTML = `<div class="col-span-3 text-center py-12 italic text-on-surface-variant">No listings matched the active filters.</div>`;
+                    }
+                }
+            } catch (err) {
+                productList.innerHTML = `<div class="col-span-3 text-center py-12 text-error font-semibold">❌ Connection error. Inventory syncing blocked.</div>`;
+            }
+        }
+
+        function addToCart(id, name, price) {
+            let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            const existing = cart.find(item => item.id === id);
+            if (existing) {
+                existing.qty = parseInt(existing.qty) + 1;
+            } else {
+                cart.push({ id, name, price, qty: 1 });
+            }
+            localStorage.setItem('cart', JSON.stringify(cart));
+            updateCartBadge();
+            
+            // Fetch Voyage AI Recommendations
+            fetchStorefrontRecommendations(id);
+        }
+
+        function updateCartBadge() {
+            const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            const total = cart.reduce((acc, item) => acc + parseInt(item.qty), 0);
+            document.getElementById('cart-badge-count').textContent = total;
+        }
+
+        async function fetchStorefrontRecommendations(productId) {
+            const container = document.getElementById('recommendations-container');
+            const list = document.getElementById('recommendations-list');
+            list.innerHTML = '';
+
+            try {
+                const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+                const excludeIds = cart.map(c => c.id).join(',');
+
+                const response = await fetch(`/recommendations/${productId}?limit=4&exclude_ids=${excludeIds}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const recs = data.recommendations || [];
+
+                    if (recs.length > 0) {
+                        container.classList.remove('hidden');
+                        recs.forEach(r => {
+                            const card = document.createElement('div');
+                            card.className = "bg-surface border-2 border-on-background p-3 flex flex-col justify-between hover:translate-y-[-1px] transition-all";
+                            const imgUrl = r.image_url || "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500&auto=format&fit=crop&q=80";
+                            
+                            card.innerHTML = `
+                                <div>
+                                    <a href="/product.html?id=${r.id}">
+                                        <div class="h-28 overflow-hidden border border-on-background mb-3 bg-surface-container-low">
+                                            <img src="${imgUrl}" alt="${r.name}" class="w-full h-full object-cover">
+                                        </div>
+                                    </a>
+                                    <h4 class="font-serif text-sm font-bold line-clamp-1 mb-1">${r.name}</h4>
+                                    <span class="font-bold text-xs text-[#c1502e]">$${parseFloat(r.price).toFixed(2)}</span>
+                                </div>
+                                <button onclick="addToCart('${r.id}', '${r.name.replace(/'/g, "\\'")}', ${r.price})" class="w-full bg-[#3e5641] text-white border border-[#1c1b19] font-caps text-[9px] py-1.5 mt-3">
+                                    ADD
+                                </button>
+                            `;
+                            list.appendChild(card);
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error("Recs error", err);
+            }
+        }
+    </script>
+</body>
+</html>

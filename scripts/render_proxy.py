@@ -1,3 +1,10 @@
+"""
+render_proxy.py — Thin reverse-proxy that listens on port 10000 (Render's
+public-facing port) and forwards ALL traffic to FastAPI on port 8000.
+
+FastAPI now serves both the API and the static HTML/CSS/JS frontend directly,
+so Streamlit is no longer needed and BACKEND_PREFIXES routing is removed.
+"""
 import asyncio
 import os
 
@@ -5,30 +12,10 @@ from aiohttp import ClientSession, WSMsgType, web
 
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
-STREAMLIT_URL = os.getenv("STREAMLIT_URL", "http://127.0.0.1:8501")
-BACKEND_PREFIXES = (
-    "/api/",
-    "/admin/",
-    "/cart/",
-    "/chat",
-    "/items",
-    "/manager/",
-    "/orders",
-    "/products",
-    "/recommendations/",
-    "/users",
-)
-
-
-def upstream_for(path: str) -> str:
-    if any(path == prefix.rstrip("/") or path.startswith(prefix) for prefix in BACKEND_PREFIXES):
-        return BACKEND_URL
-    return STREAMLIT_URL
 
 
 async def proxy_http(request: web.Request) -> web.StreamResponse:
-    upstream = upstream_for(request.path)
-    target = f"{upstream}{request.rel_url}"
+    target = f"{BACKEND_URL}{request.rel_url}"
     headers = {
         key: value
         for key, value in request.headers.items()
@@ -57,8 +44,7 @@ async def proxy_http(request: web.Request) -> web.StreamResponse:
 
 
 async def proxy_websocket(request: web.Request) -> web.WebSocketResponse:
-    upstream = upstream_for(request.path)
-    target = f"{upstream.replace('http', 'ws', 1)}{request.rel_url}"
+    target = f"{BACKEND_URL.replace('http', 'ws', 1)}{request.rel_url}"
     requested_protocols = [
         protocol.strip()
         for protocol in request.headers.get("sec-websocket-protocol", "").split(",")

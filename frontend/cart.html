@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Nearby | Ledger Cart & Orders</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Georgia:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="/css/style.css" rel="stylesheet">
+</head>
+<body class="bg-background text-on-background font-body-base antialiased">
+
+    <!-- Top sticky AppBar -->
+    <header class="w-full top-0 sticky z-40 bg-background border-b-2 border-on-background shadow-[4px_4px_0px_0px_rgba(28,27,25,1)]">
+        <div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop py-stack-md max-w-[1200px] mx-auto">
+            <div class="flex items-center gap-4">
+                <button class="hover:bg-primary-fixed-dim transition-all p-2 active:translate-x-1 active:translate-y-1 active:shadow-none" onclick="window.history.back()">
+                    <span class="material-symbols-outlined text-primary">arrow_back</span>
+                </button>
+                <h1 class="font-display-lg text-display-lg-mobile text-primary uppercase tracking-tight" onclick="window.location.href='/index.html'" style="cursor:pointer">Nearby</h1>
+            </div>
+            
+            <div class="flex items-center gap-6">
+                <nav class="hidden md:flex gap-8">
+                    <a class="font-caps text-xs text-on-surface-variant hover:text-primary transition-colors" href="/index.html">Market</a>
+                    <a class="font-caps text-xs text-primary hover:underline" href="/cart.html">Cart</a>
+                    <a class="font-caps text-xs text-on-surface-variant hover:text-primary transition-colors" href="/login.html" onclick="logoutUser(event)">Logout</a>
+                </nav>
+                <a href="/cart.html" class="hover:bg-primary-fixed-dim transition-all p-2 active:translate-x-1 active:translate-y-1 active:shadow-none relative">
+                    <span class="material-symbols-outlined text-primary">shopping_bag</span>
+                    <span class="absolute -top-1 -right-1 bg-primary text-white text-[10px] w-5 h-5 flex items-center justify-center font-bold border-2 border-on-background" id="cart-badge-count">0</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1200px] mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg relative z-10">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- Cart details section (8 columns) -->
+            <div class="lg:col-span-8 space-y-6">
+                <div class="double-rule bg-surface p-6 hard-shadow">
+                    <h2 class="font-display-lg text-2xl border-b-2 border-on-background pb-3 mb-6">Shopping Ledger</h2>
+                    
+                    <div id="cart-items-container" class="space-y-4">
+                        <!-- Loaded dynamically -->
+                    </div>
+
+                    <div id="cart-total-section" class="border-t-2 border-on-background pt-4 mt-6 flex justify-between items-center hidden">
+                        <span class="font-caps text-sm text-on-surface-variant">LEDGER DEBT TOTAL:</span>
+                        <span class="font-display-lg text-3xl text-primary" id="cart-total-value">$0.00</span>
+                    </div>
+
+                    <div id="cart-actions-section" class="mt-6 flex justify-between gap-4 hidden">
+                        <button onclick="clearCart()" class="bg-surface-container-low border border-[#1c1b19] px-4 py-2 font-caps text-xs hover:bg-surface-container-high">CLEAR CART</button>
+                        <button onclick="checkoutCart()" class="bg-primary text-white border-2 border-[#1c1b19] hard-shadow px-6 py-2.5 font-caps text-xs font-bold hover:bg-primary/95">CHECKOUT & RESERVE STOCK</button>
+                    </div>
+                </div>
+
+                <!-- AI Cart Summary -->
+                <div id="ai-summary-box" class="double-rule border-[#3e5641] bg-[#ceeace]/10 p-5 hard-shadow hidden">
+                    <div class="flex items-center gap-2 text-[#3e5641] mb-2">
+                        <span class="material-symbols-outlined">insights</span>
+                        <h4 class="font-caps text-[10px] font-bold">AI BOOKKEEPER CART ANALYSIS</h4>
+                    </div>
+                    <p id="ai-summary-text" class="text-sm italic text-on-surface-variant font-medium">Analyzing contents of current shopping ledger...</p>
+                </div>
+
+                <!-- Checkout Success / Failure Notification -->
+                <div id="checkout-notification" class="hidden double-rule bg-surface p-6 hard-shadow">
+                    <!-- Success screen info -->
+                </div>
+            </div>
+
+            <!-- Order History Sidebar (4 columns) -->
+            <div class="lg:col-span-4 space-y-6">
+                <div class="double-rule bg-surface-container-low p-5 hard-shadow">
+                    <h3 class="font-display-lg text-xl mb-4 italic">Order History</h3>
+                    <p class="text-xs text-on-surface-variant mb-4">Past transactions logged on your resident registry.</p>
+                    
+                    <div id="order-history-list" class="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+                        <div class="text-center py-6 text-xs text-on-surface-variant italic">Syncing transaction ledger...</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Bottom Navigation on Mobile -->
+    <nav class="md:hidden fixed bottom-0 left-0 w-full h-16 flex justify-around items-center bg-background border-t-2 border-on-background z-50">
+        <a class="flex flex-col items-center justify-center text-on-surface-variant py-2 px-4 h-full" href="/index.html">
+            <span class="material-symbols-outlined">storefront</span>
+            <span class="font-caps text-[9px]">MARKET</span>
+        </a>
+        <a class="flex flex-col items-center justify-center bg-primary text-white border-t-2 border-on-background -mt-0.5 px-4 h-full" href="/cart.html">
+            <span class="material-symbols-outlined">shopping_bag</span>
+            <span class="font-caps text-[9px]">CART</span>
+        </a>
+        <a class="flex flex-col items-center justify-center text-on-surface-variant py-2 px-4 h-full" href="/login.html" onclick="logoutUser(event)">
+            <span class="material-symbols-outlined">logout</span>
+            <span class="font-caps text-[9px]">LOGOUT</span>
+        </a>
+    </nav>
+
+    <!-- Floating Chatbot script -->
+    <script src="/js/chatbot.js"></script>
+
+    <script>
+        // Check authentication
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+        if (!currentUser) {
+            window.location.href = '/login.html';
+        }
+
+        function logoutUser(e) {
+            e.preventDefault();
+            localStorage.removeItem('currentUser');
+            sessionStorage.removeItem('chatbot_history');
+            window.location.href = '/login.html';
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            renderCart();
+            fetchOrderHistory();
+        });
+
+        function updateCartBadge() {
+            const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            const total = cart.reduce((acc, item) => acc + parseInt(item.qty), 0);
+            document.getElementById('cart-badge-count').textContent = total;
+        }
+
+        function renderCart() {
+            const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            const container = document.getElementById('cart-items-container');
+            const totalSection = document.getElementById('cart-total-section');
+            const actionsSection = document.getElementById('cart-actions-section');
+            const aiBox = document.getElementById('ai-summary-box');
+
+            updateCartBadge();
+
+            if (cart.length === 0) {
+                container.innerHTML = `<div class="text-center py-12 italic text-on-surface-variant">Your shopping ledger cart is empty.</div>`;
+                totalSection.classList.add('hidden');
+                actionsSection.classList.add('hidden');
+                aiBox.classList.add('hidden');
+                return;
+            }
+
+            container.innerHTML = '';
+            totalSection.classList.remove('hidden');
+            actionsSection.classList.remove('hidden');
+            aiBox.classList.remove('hidden');
+
+            let total = 0;
+
+            cart.forEach((item, idx) => {
+                const subtotal = item.price * item.qty;
+                total += subtotal;
+
+                const row = document.createElement('div');
+                row.className = "flex justify-between items-center p-3 border border-on-background/10 bg-surface-container-low hover:bg-surface-container-high transition-colors";
+                row.innerHTML = `
+                    <div class="flex-1 pr-4">
+                        <a href="/product.html?id=${item.id}">
+                            <h4 class="font-serif font-bold text-md hover:text-primary transition-colors">${item.name}</h4>
+                        </a>
+                        <span class="text-xs text-on-surface-variant font-caps">PRICE: $${parseFloat(item.price).toFixed(2)}</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <label class="text-[10px] font-caps text-on-surface-variant">QTY:</label>
+                            <input type="number" min="1" value="${item.qty}" onchange="updateQty(${idx}, this.value)" class="notepad-line w-12 text-center font-bold">
+                        </div>
+                        <span class="font-bold text-sm min-w-16 text-right">$${subtotal.toFixed(2)}</span>
+                        <button onclick="removeItem(${idx})" class="text-error hover:text-error/80 transition-colors p-1">
+                            <span class="material-symbols-outlined">delete</span>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+
+            document.getElementById('cart-total-value').textContent = `$${total.toFixed(2)}`;
+            fetchAICartSummary();
+        }
+
+        function updateQty(idx, val) {
+            let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            cart[idx].qty = Math.max(1, parseInt(val || 1));
+            localStorage.setItem('cart', JSON.stringify(cart));
+            renderCart();
+        }
+
+        function removeItem(idx) {
+            let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            cart.splice(idx, 1);
+            localStorage.setItem('cart', JSON.stringify(cart));
+            renderCart();
+        }
+
+        function clearCart() {
+            localStorage.setItem('cart', '[]');
+            renderCart();
+        }
+
+        async function fetchAICartSummary() {
+            const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            const textEl = document.getElementById('ai-summary-text');
+            textEl.textContent = "Analyzing contents of current shopping ledger...";
+
+            try {
+                const itemsMapped = cart.map(item => ({
+                    product_id: parseInt(item.id),
+                    name: item.name,
+                    price: parseFloat(item.price),
+                    quantity: parseInt(item.qty)
+                }));
+
+                const response = await fetch('/cart/summary', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        items: itemsMapped
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    textEl.textContent = data.reply || 'Analysis complete.';
+                } else {
+                    textEl.textContent = "⚠️ Unable to get analysis from AI Bookkeeper.";
+                }
+            } catch (err) {
+                textEl.textContent = "⚠️ Error communicating with analysis engine.";
+            }
+        }
+
+        async function checkoutCart() {
+            const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            const notification = document.getElementById('checkout-notification');
+
+            try {
+                const itemsMapped = cart.map(item => ({
+                    product_id: parseInt(item.id),
+                    quantity: parseInt(item.qty)
+                }));
+
+                const response = await fetch('/orders', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: currentUser.id,
+                        items: itemsMapped
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Clear cart
+                    localStorage.setItem('cart', '[]');
+                    renderCart();
+
+                    notification.className = "double-rule border-[#3e5641] bg-[#ceeace]/10 p-6 hard-shadow mt-6";
+                    notification.innerHTML = `
+                        <div class="flex items-center gap-2 text-[#3e5641] mb-3">
+                            <span class="material-symbols-outlined text-2xl">check_circle</span>
+                            <h3 class="font-display-lg text-lg">Order Created in Ledger</h3>
+                        </div>
+                        <p class="text-sm mb-4">Your order <strong>#${data.order_id}</strong> has been logged. Delivery driver assigned (ID #${data.driver_id || 'N/A'}).</p>
+                        <div class="bg-surface border border-on-background/10 p-3 text-xs mb-4">
+                            <strong>Note:</strong> Driver status will update on your order history ledger shortly. Ask the Bookkeeper if you have tracking queries.
+                        </div>
+                        <button onclick="document.getElementById('checkout-notification').classList.add('hidden')" class="bg-primary text-white font-caps text-xs py-1.5 px-4">OKAY</button>
+                    `;
+                    fetchOrderHistory();
+                } else {
+                    const errDetail = await response.json();
+                    alert(`❌ Checkout Failed: ${errDetail.detail || 'Overselling protection triggered.'}`);
+                }
+            } catch (err) {
+                alert("❌ Server transaction error.");
+            }
+        }
+
+        async function fetchOrderHistory() {
+            const list = document.getElementById('order-history-list');
+            try {
+                const response = await fetch(`/users/${currentUser.id}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Group order details returned by FastAPI user details SQL query
+                    const grouped = {};
+                    data.forEach(row => {
+                        if (row.order_id) {
+                            grouped[row.order_id] = grouped[row.order_id] || [];
+                            grouped[row.order_id].push(row);
+                        }
+                    });
+
+                    const keys = Object.keys(grouped).sort((a, b) => b - a);
+                    if (keys.length === 0) {
+                        list.innerHTML = `<div class="text-center py-6 text-xs text-on-surface-variant italic">No logged orders.</div>`;
+                        return;
+                    }
+
+                    list.innerHTML = '';
+                    keys.forEach(orderId => {
+                        const rows = grouped[orderId];
+                        const first = rows[0];
+
+                        const card = document.createElement('div');
+                        card.className = "bg-surface border border-on-background/10 p-3 text-xs flex flex-col gap-2";
+                        
+                        let itemText = rows.map(r => `${r.quantity}x ${r.product_name || 'Item'}`).join(', ');
+
+                        let deliveryInfo = '';
+                        if (first.delivery_status) {
+                            deliveryInfo = `
+                                <div class="bg-[#f7f3ec] p-2 mt-2 border-l-2 border-primary">
+                                    <p class="font-bold font-caps text-[9px] text-[#c1502e] mb-1">🚚 Status: ${first.delivery_status}</p>
+                                    <p class="text-[10px] text-on-surface-variant">Location: ${first.current_location || 'Warehouse'}</p>
+                                    <p class="text-[10px] text-on-surface-variant italic">"${first.tracking_note || ''}"</p>
+                                </div>
+                            `;
+                        } else {
+                            deliveryInfo = `<div class="text-[10px] text-on-surface-variant italic mt-1">Pending driver assignment...</div>`;
+                        }
+
+                        card.innerHTML = `
+                            <div class="flex justify-between items-center border-b border-on-background/5 pb-1">
+                                <span class="font-bold">Order #${orderId}</span>
+                                <span class="text-on-surface-variant text-[10px]">${new Date(first.shipped_at || Date.now()).toLocaleDateString()}</span>
+                            </div>
+                            <div class="text-on-surface-variant font-medium">${itemText}</div>
+                            ${deliveryInfo}
+                        `;
+                        list.appendChild(card);
+                    });
+                }
+            } catch (err) {
+                list.innerHTML = `<div class="text-center py-6 text-xs text-error">❌ Sync failure.</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

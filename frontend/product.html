@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Nearby | Product Curation</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Georgia:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="/css/style.css" rel="stylesheet">
+</head>
+<body class="bg-background text-on-background font-body-base overflow-x-hidden min-h-screen">
+
+    <!-- Top sticky AppBar -->
+    <header class="w-full top-0 sticky z-40 bg-background border-b-2 border-on-background shadow-[4px_4px_0px_0px_rgba(28,27,25,1)]">
+        <div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop py-stack-md max-w-[1200px] mx-auto">
+            <div class="flex items-center gap-4">
+                <button class="hover:bg-primary-fixed-dim transition-all p-2 active:translate-x-1 active:translate-y-1 active:shadow-none" onclick="window.history.back()">
+                    <span class="material-symbols-outlined text-primary">arrow_back</span>
+                </button>
+                <h1 class="font-display-lg text-display-lg-mobile text-primary uppercase tracking-tight" onclick="window.location.href='/index.html'" style="cursor:pointer">Nearby</h1>
+            </div>
+            
+            <div class="flex items-center gap-6">
+                <nav class="hidden md:flex gap-8">
+                    <a class="font-caps text-xs text-on-surface-variant hover:text-primary transition-colors" href="/index.html">Market</a>
+                    <a class="font-caps text-xs text-on-surface-variant hover:text-primary transition-colors" href="/cart.html">Cart</a>
+                    <a class="font-caps text-xs text-on-surface-variant hover:text-primary transition-colors" href="/login.html" onclick="logoutUser(event)">Logout</a>
+                </nav>
+                <a href="/cart.html" class="hover:bg-primary-fixed-dim transition-all p-2 active:translate-x-1 active:translate-y-1 active:shadow-none relative">
+                    <span class="material-symbols-outlined text-primary">shopping_bag</span>
+                    <span class="absolute -top-1 -right-1 bg-primary text-white text-[10px] w-5 h-5 flex items-center justify-center font-bold border-2 border-on-background" id="cart-badge-count">0</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1200px] mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg relative z-10">
+        
+        <!-- Main Product Section -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-stack-lg" id="product-container">
+            <div class="md:col-span-12 text-center py-12 italic text-on-surface-variant">Accessing ledger item details...</div>
+        </div>
+
+        <!-- Recommendations panel -->
+        <div id="recommendations-container" class="mt-16 pt-8 border-t-2 border-on-background/10 hidden">
+            <h3 class="font-display-lg text-2xl mb-6 italic">You Might Also Like</h3>
+            <div id="recommendations-list" class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <!-- Loaded dynamically -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Bottom Navigation on Mobile -->
+    <nav class="md:hidden fixed bottom-0 left-0 w-full h-16 flex justify-around items-center bg-background border-t-2 border-on-background z-50">
+        <a class="flex flex-col items-center justify-center text-on-surface-variant py-2 px-4 h-full" href="/index.html">
+            <span class="material-symbols-outlined">storefront</span>
+            <span class="font-caps text-[9px]">MARKET</span>
+        </a>
+        <a class="flex flex-col items-center justify-center text-on-surface-variant py-2 px-4 h-full" href="/cart.html">
+            <span class="material-symbols-outlined">shopping_bag</span>
+            <span class="font-caps text-[9px]">CART</span>
+        </a>
+        <a class="flex flex-col items-center justify-center text-on-surface-variant py-2 px-4 h-full" href="/login.html" onclick="logoutUser(event)">
+            <span class="material-symbols-outlined">logout</span>
+            <span class="font-caps text-[9px]">LOGOUT</span>
+        </a>
+    </nav>
+
+    <!-- Floating Chatbot script -->
+    <script src="/js/chatbot.js"></script>
+
+    <script>
+        // Check authentication
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+        if (!currentUser) {
+            window.location.href = '/login.html';
+        }
+
+        function logoutUser(e) {
+            e.preventDefault();
+            localStorage.removeItem('currentUser');
+            sessionStorage.removeItem('chatbot_history');
+            window.location.href = '/login.html';
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchProductDetails();
+            updateCartBadge();
+        });
+
+        function updateCartBadge() {
+            const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            const total = cart.reduce((acc, item) => acc + parseInt(item.qty), 0);
+            document.getElementById('cart-badge-count').textContent = total;
+        }
+
+        async function fetchProductDetails() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const productId = parseInt(urlParams.get('id'));
+
+            const container = document.getElementById('product-container');
+
+            if (!productId) {
+                container.innerHTML = `<div class="col-span-12 text-center text-error font-semibold">❌ Invalid Ledger Product ID.</div>`;
+                return;
+            }
+
+            try {
+                // Fetch all products to find current
+                const response = await fetch('/products');
+                if (response.ok) {
+                    const list = await response.json();
+                    const p = list.find(item => item.id === productId);
+
+                    if (p) {
+                        const imgUrl = p.image_url || "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500&auto=format&fit=crop&q=80";
+                        const stock = parseInt(p.stock || 0);
+                        const threshold = parseInt(p.low_stock_threshold || 10);
+                        
+                        let stockBadge = '';
+                        if (stock <= 0) {
+                            stockBadge = `<span class="bg-error text-white px-3 py-1 font-caps text-[10px] border border-on-background">OUT OF STOCK</span>`;
+                        } else if (stock <= threshold) {
+                            stockBadge = `<span class="bg-primary text-white px-3 py-1 font-caps text-[10px] border border-on-background animate-pulse">LOW STOCK</span>`;
+                        } else {
+                            stockBadge = `<span class="bg-[#ceeace] text-[#09200f] px-3 py-1 font-caps text-[10px] border border-on-background">IN STOCK</span>`;
+                        }
+
+                        container.innerHTML = `
+                            <div class="md:col-span-7">
+                                <div class="double-rule bg-surface overflow-hidden hard-shadow">
+                                    <img class="w-full h-[400px] md:h-[550px] object-cover" src="${imgUrl}" alt="${p.name}">
+                                </div>
+                            </div>
+                            <div class="md:col-span-5 flex flex-col justify-between">
+                                <div class="double-rule bg-surface-container-low p-6 hard-shadow">
+                                    <div class="flex justify-between items-start mb-6">
+                                        <div>
+                                            <span class="font-caps text-[10px] text-on-surface-variant uppercase block mb-1">Price per unit</span>
+                                            <span class="font-display-lg text-3xl text-primary">$${parseFloat(p.price).toFixed(2)}</span>
+                                        </div>
+                                        ${stockBadge}
+                                    </div>
+                                    
+                                    <h2 class="font-display-lg text-2xl text-on-background leading-tight mb-4">${p.name}</h2>
+                                    
+                                    <div class="space-y-4 mb-8">
+                                        <div class="flex justify-between items-center py-2 border-b border-on-background/10">
+                                            <span class="text-xs text-on-surface-variant font-caps">Category</span>
+                                            <span class="font-bold text-sm">${p.ai_category || 'Other'}</span>
+                                        </div>
+                                        <div class="flex justify-between items-center py-2 border-b border-on-background/10">
+                                            <span class="text-xs text-on-surface-variant font-caps">Locality</span>
+                                            <span class="font-bold text-sm">📍 ${p.locality || 'Global'}</span>
+                                        </div>
+                                        <div class="flex justify-between items-center py-2 border-b border-on-background/10">
+                                            <span class="text-xs text-on-surface-variant font-caps">Stock Left</span>
+                                            <span class="font-bold text-sm">${stock} units</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-6">
+                                        <label for="product-qty" class="font-caps text-[10px] text-on-surface-variant block mb-1">QUANTITY</label>
+                                        <input type="number" id="product-qty" min="1" max="${Math.max(1, stock)}" value="1" class="notepad-line w-20 text-center font-bold" ${stock <= 0 ? 'disabled' : ''}>
+                                    </div>
+
+                                    <button onclick="addProductToCart(${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.price})" class="w-full bg-primary text-white border-2 border-on-background py-3 font-caps text-xs font-bold tracking-wider hover:bg-primary/95 active:translate-y-[1px]" ${stock <= 0 ? 'disabled' : ''}>
+                                        ADD TO LEDGER CART
+                                    </button>
+                                </div>
+
+                                <div class="mt-8 p-4 border border-on-background/15 bg-surface italic text-sm text-on-surface-variant max-w-prose">
+                                    <h4 class="font-serif font-bold text-xs not-italic uppercase mb-1">Item Ledger Notes</h4>
+                                    "${p.description || 'This hyperlocal item was sourced with care and vetted for resident utility. Connect with support or Ask the Bookkeeper if you need delivery estimates.'}"
+                                </div>
+                            </div>
+                        `;
+
+                        // Load Recommendations
+                        fetchProductRecommendations(productId);
+                    } else {
+                        container.innerHTML = `<div class="col-span-12 text-center text-error font-semibold">❌ Ledger item not found.</div>`;
+                    }
+                }
+            } catch (err) {
+                container.innerHTML = `<div class="col-span-12 text-center text-error font-semibold">❌ Server connection failure.</div>`;
+            }
+        }
+
+        function addProductToCart(id, name, price) {
+            const qty = parseInt(document.getElementById('product-qty').value || 1);
+            let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            const existing = cart.find(item => item.id === id);
+            if (existing) {
+                existing.qty = parseInt(existing.qty) + qty;
+            } else {
+                cart.push({ id, name, price, qty });
+            }
+            localStorage.setItem('cart', JSON.stringify(cart));
+            updateCartBadge();
+            alert(`Added ${qty} x ${name} to Cart.`);
+            
+            // Reload Recommendations excluding cart items
+            fetchProductRecommendations(id);
+        }
+
+        async function fetchProductRecommendations(productId) {
+            const container = document.getElementById('recommendations-container');
+            const list = document.getElementById('recommendations-list');
+            list.innerHTML = '';
+
+            try {
+                const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+                const excludeIds = cart.map(c => c.id).join(',');
+
+                const response = await fetch(`/recommendations/${productId}?limit=4&exclude_ids=${excludeIds}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const recs = data.recommendations || [];
+
+                    if (recs.length > 0) {
+                        container.classList.remove('hidden');
+                        recs.forEach(r => {
+                            const card = document.createElement('div');
+                            card.className = "bg-surface border-2 border-on-background p-3 flex flex-col justify-between hover:translate-y-[-1px] transition-all";
+                            const imgUrl = r.image_url || "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500&auto=format&fit=crop&q=80";
+                            
+                            card.innerHTML = `
+                                <div>
+                                    <a href="/product.html?id=${r.id}">
+                                        <div class="h-28 overflow-hidden border border-on-background mb-3 bg-surface-container-low">
+                                            <img src="${imgUrl}" alt="${r.name}" class="w-full h-full object-cover">
+                                        </div>
+                                    </a>
+                                    <h4 class="font-serif text-sm font-bold line-clamp-1 mb-1">${r.name}</h4>
+                                    <span class="font-bold text-xs text-[#c1502e]">$${parseFloat(r.price).toFixed(2)}</span>
+                                </div>
+                                <button onclick="addProductToCart('${r.id}', '${r.name.replace(/'/g, "\\'")}', ${r.price})" class="w-full bg-[#3e5641] text-white border border-[#1c1b19] font-caps text-[9px] py-1.5 mt-3">
+                                    ADD
+                                </button>
+                            `;
+                            list.appendChild(card);
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error("Recs error", err);
+            }
+        }
+    </script>
+</body>
+</html>

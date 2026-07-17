@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Nearby | Vendor Ledger</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Georgia:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="/css/style.css" rel="stylesheet">
+</head>
+<body class="bg-background text-on-background font-body-base overflow-x-hidden min-h-screen">
+
+    <!-- Top sticky AppBar -->
+    <header class="w-full top-0 sticky z-40 bg-background border-b-2 border-on-background shadow-[4px_4px_0px_0px_rgba(28,27,25,1)]">
+        <div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop py-stack-md max-w-[1200px] mx-auto">
+            <div class="flex items-center gap-4">
+                <button class="hover:bg-primary-fixed-dim transition-all p-2 active:translate-x-1 active:translate-y-1 active:shadow-none">
+                    <span class="material-symbols-outlined text-primary">menu_book</span>
+                </button>
+                <h1 class="font-display-lg text-display-lg-mobile text-primary uppercase tracking-tight" onclick="window.location.reload()" style="cursor:pointer">Nearby Ledger</h1>
+            </div>
+            
+            <div class="flex items-center gap-6">
+                <nav class="hidden md:flex gap-8">
+                    <a class="font-caps text-xs text-primary hover:underline" href="/vendor.html">Inventory</a>
+                    <a class="font-caps text-xs text-on-surface-variant hover:text-primary transition-colors" href="/insights.html">Insights</a>
+                    <a class="font-caps text-xs text-on-surface-variant hover:text-primary transition-colors" href="/login.html" onclick="logoutUser(event)">Logout</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1200px] mx-auto px-margin-mobile md:px-margin-desktop py-stack-lg relative z-10">
+        
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-stack-md border-b-2 border-on-background pb-6 mb-8">
+            <div>
+                <span class="font-caps text-[9px] text-primary block mb-1">INVENTORY CONTROL registry</span>
+                <h1 class="font-display-lg text-4xl text-on-background leading-none">Vendor Ledger</h1>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="toggleAddProductForm()" class="bg-primary text-white border-2 border-on-background hard-shadow px-5 py-2 font-caps text-xs font-bold hover:bg-primary/95 active:translate-y-[1px]">
+                    ➕ ADD PRODUCT
+                </button>
+            </div>
+        </div>
+
+        <!-- Add product expander form -->
+        <div id="add-product-container" class="hidden double-rule bg-surface p-6 hard-shadow mb-8">
+            <h3 class="font-display-lg text-xl border-b border-on-background/10 pb-2 mb-4">Add Product to Registry</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                <div>
+                    <label class="font-caps text-[9px] text-on-surface-variant block mb-1">PRODUCT NAME</label>
+                    <input type="text" id="add-name" placeholder="e.g. Sourdough Loaf" class="notepad-line w-full text-sm">
+                </div>
+                <div>
+                    <label class="font-caps text-[9px] text-on-surface-variant block mb-1">PRICE ($)</label>
+                    <input type="number" id="add-price" step="0.01" value="0.00" class="notepad-line w-full text-sm font-bold">
+                </div>
+                <div>
+                    <label class="font-caps text-[9px] text-on-surface-variant block mb-1">STOCK QUANTITY</label>
+                    <input type="number" id="add-stock" value="10" class="notepad-line w-full text-sm">
+                </div>
+                <div>
+                    <label class="font-caps text-[9px] text-on-surface-variant block mb-1">LOW STOCK THRESHOLD</label>
+                    <input type="number" id="add-threshold" value="5" class="notepad-line w-full text-sm">
+                </div>
+                <div>
+                    <label class="font-caps text-[9px] text-on-surface-variant block mb-1">LOCALITY DISTRICT</label>
+                    <input type="text" id="add-locality" placeholder="e.g. Uptown" class="notepad-line w-full text-sm">
+                </div>
+                <div>
+                    <label class="font-caps text-[9px] text-on-surface-variant block mb-1">PRODUCT IMAGE SOURCE</label>
+                    <select id="add-img-source" onchange="toggleImageInputs(this.value)" class="notepad-line w-full text-sm">
+                        <option value="auto">Auto-suggest (LoremFlickr)</option>
+                        <option value="url">Provide Web Image URL</option>
+                        <option value="upload">Upload Image from Computer</option>
+                        <option value="none">No Image</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Image sub inputs -->
+            <div id="add-img-url-box" class="hidden mb-4">
+                <label class="font-caps text-[9px] text-on-surface-variant block mb-1">IMAGE URL</label>
+                <input type="text" id="add-img-url" placeholder="https://example.com/image.jpg" class="notepad-line w-full text-sm">
+            </div>
+            <div id="add-img-file-box" class="hidden mb-4">
+                <label class="font-caps text-[9px] text-on-surface-variant block mb-1">UPLOAD IMAGE FILE</label>
+                <input type="file" id="add-img-file" class="notepad-line w-full text-sm">
+            </div>
+
+            <div class="flex justify-end gap-3 mt-4">
+                <button onclick="toggleAddProductForm()" class="bg-surface-container-low border border-on-background px-4 py-2 font-caps text-xs">CANCEL</button>
+                <button onclick="saveNewProduct()" class="bg-primary text-white border border-on-background px-5 py-2 font-caps text-xs font-bold">ADD TO REGISTRY</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- Table registry (8 columns) -->
+            <div class="lg:col-span-8 bg-surface border-2 border-on-background hard-shadow overflow-hidden">
+                <div class="p-4 bg-[#ceeace]/20 border-b-2 border-on-background flex justify-between items-center">
+                    <h3 class="font-display-lg text-lg text-secondary">Stock Registry</h3>
+                    <button onclick="fetchVendorProducts()" class="text-xs font-caps hover:underline">🔄 REFRESH</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse" id="vendor-table">
+                        <thead>
+                            <tr class="bg-surface-container-high border-b-2 border-on-background">
+                                <th class="p-4 font-caps text-[9px] text-on-surface-variant">Product</th>
+                                <th class="p-4 font-caps text-[9px] text-on-surface-variant">Stock</th>
+                                <th class="p-4 font-caps text-[9px] text-on-surface-variant text-right">Price</th>
+                                <th class="p-4 font-caps text-[9px] text-on-surface-variant">Status</th>
+                                <th class="p-4 font-caps text-[9px] text-on-surface-variant text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y-2 divide-on-background/5" id="vendor-product-list">
+                            <!-- Loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Insights sidebar (4 columns) -->
+            <div class="lg:col-span-4 space-y-6">
+                <!-- Stock warnings -->
+                <div class="double-rule border-[#ba1a1a] bg-[#ffdad6]/20 p-5 hard-shadow">
+                    <div class="flex items-center gap-2 text-error mb-3">
+                        <span class="material-symbols-outlined">warning</span>
+                        <h4 class="font-caps text-[10px] font-bold">CRITICAL STOCK WARNINGS</h4>
+                    </div>
+                    <div id="vendor-alerts-list" class="space-y-3">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Floating Chatbot script -->
+    <script src="/js/chatbot.js"></script>
+
+    <script>
+        // Check authentication & vendor role
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+        if (!currentUser || currentUser.role !== 'vendor') {
+            window.location.href = '/login.html';
+        }
+
+        function logoutUser(e) {
+            e.preventDefault();
+            localStorage.removeItem('currentUser');
+            sessionStorage.removeItem('chatbot_history');
+            window.location.href = '/login.html';
+        }
+
+        function toggleAddProductForm() {
+            const form = document.getElementById('add-product-container');
+            form.classList.toggle('hidden');
+        }
+
+        function toggleImageInputs(val) {
+            const urlBox = document.getElementById('add-img-url-box');
+            const fileBox = document.getElementById('add-img-file-box');
+            urlBox.classList.add('hidden');
+            fileBox.classList.add('hidden');
+
+            if (val === 'url') {
+                urlBox.classList.remove('hidden');
+            } else if (val === 'upload') {
+                fileBox.classList.remove('hidden');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchVendorProducts();
+        });
+
+        async function fetchVendorProducts() {
+            const tbody = document.getElementById('vendor-product-list');
+            const alertsList = document.getElementById('vendor-alerts-list');
+
+            tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center italic text-on-surface-variant">Syncing vendor inventory ledger...</td></tr>`;
+            alertsList.innerHTML = `<p class="text-xs text-on-surface-variant italic">Checking stock health...</p>`;
+
+            try {
+                const response = await fetch(`/vendor/products?vendor_id=${currentUser.id}`);
+                if (response.ok) {
+                    const products = await response.json();
+                    tbody.innerHTML = '';
+                    alertsList.innerHTML = '';
+
+                    let warningCount = 0;
+
+                    if (products.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center italic text-on-surface-variant">No items found in your registry.</td></tr>`;
+                        alertsList.innerHTML = `<p class="text-xs text-[#3e5641] font-semibold">✅ All product inventory levels are healthy!</p>`;
+                        return;
+                    }
+
+                    products.forEach(p => {
+                        const stock = parseInt(p.stock || 0);
+                        const threshold = parseInt(p.low_stock_threshold || 10);
+                        
+                        let statusText = '';
+                        let rowClass = '';
+                        if (stock <= 0) {
+                            statusText = `<span class="bg-[#ba1a1a] text-white px-2 py-0.5 text-[9px] font-caps">OUT</span>`;
+                            rowClass = 'bg-[#ffdad6]/10';
+                            warningCount++;
+                            appendAlertItem(p);
+                        } else if (stock <= threshold) {
+                            statusText = `<span class="bg-primary text-white px-2 py-0.5 text-[9px] font-caps animate-pulse">LOW</span>`;
+                            rowClass = 'bg-[#ffdbd1]/10';
+                            warningCount++;
+                            appendAlertItem(p);
+                        } else {
+                            statusText = `<span class="bg-[#ceeace] text-[#09200f] px-2 py-0.5 text-[9px] font-caps">OKAY</span>`;
+                        }
+
+                        const tr = document.createElement('tr');
+                        tr.className = `hover:bg-primary-fixed-dim/5 transition-colors ${rowClass}`;
+                        tr.id = `row-prod-${p.id}`;
+                        
+                        tr.innerHTML = `
+                            <td class="p-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 border border-on-background shrink-0 bg-surface-container-low">
+                                        <img class="w-full h-full object-cover" src="${p.image_url || 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=500&auto=format&fit=crop&q=80'}">
+                                    </div>
+                                    <div>
+                                        <div class="font-bold text-sm">${p.name}</div>
+                                        <div class="text-[10px] text-on-surface-variant font-mono">ID: ${p.id} | Locality: ${p.locality || 'N/A'}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="p-4 font-semibold text-sm">${stock}</td>
+                            <td class="p-4 text-right font-bold text-sm">$${parseFloat(p.price).toFixed(2)}</td>
+                            <td class="p-4">${statusText}</td>
+                            <td class="p-4 text-center">
+                                <div class="flex justify-center gap-2">
+                                    <button onclick="editProductInline(${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.price}, ${stock}, ${threshold}, '${p.locality || ''}', '${p.image_url || ''}')" class="bg-surface border border-on-background text-xs px-2.5 py-1">EDIT</button>
+                                    <button onclick="deleteProduct(${p.id})" class="bg-error text-white text-xs px-2.5 py-1">DEL</button>
+                                </div>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+
+                    if (warningCount === 0) {
+                        alertsList.innerHTML = `<p class="text-xs text-[#3e5641] font-semibold">✅ All product inventory levels are healthy!</p>`;
+                    }
+                }
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-error font-semibold">❌ Connection failure. Registry inaccessible.</td></tr>`;
+            }
+        }
+
+        function appendAlertItem(p) {
+            const alertsList = document.getElementById('vendor-alerts-list');
+            const alertItem = document.createElement('div');
+            alertItem.className = "bg-surface border border-error p-3 text-xs";
+            alertItem.innerHTML = `
+                <div class="flex justify-between items-center mb-1">
+                    <strong>${p.name}</strong>
+                    <span class="text-error font-bold">${p.stock} units left</span>
+                </div>
+                <div class="text-[10px] text-on-surface-variant">Alert threshold: ${p.low_stock_threshold} | Locality: ${p.locality || 'N/A'}</div>
+            `;
+            alertsList.appendChild(alertItem);
+        }
+
+        async function deleteProduct(productId) {
+            if (!confirm("Are you sure you want to remove this product listing from the ledger?")) return;
+
+            try {
+                const response = await fetch(`/products/${productId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${currentUser.token}`
+                    }
+                });
+
+                if (response.ok) {
+                    alert("Product deleted successfully.");
+                    fetchVendorProducts();
+                } else {
+                    const errDetail = await response.json();
+                    alert(`❌ Delete Failed: ${errDetail.detail || 'Access restricted.'}`);
+                }
+            } catch (err) {
+                alert("❌ Server connection error.");
+            }
+        }
+
+        function editProductInline(id, name, price, stock, threshold, locality, imageUrl) {
+            const tr = document.getElementById(`row-prod-${id}`);
+            
+            tr.innerHTML = `
+                <td colspan="5" class="p-4 bg-surface-container-low border border-on-background">
+                    <div class="font-caps text-[10px] font-bold text-primary mb-3">MODIFY REGISTRY LISTING - ID: ${id}</div>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+                        <div>
+                            <label class="text-[9px] font-caps text-on-surface-variant block mb-1">PRICE ($)</label>
+                            <input type="number" id="edit-price-${id}" step="0.01" value="${price}" class="notepad-line w-full text-xs font-bold">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-caps text-on-surface-variant block mb-1">STOCK</label>
+                            <input type="number" id="edit-stock-${id}" value="${stock}" class="notepad-line w-full text-xs">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-caps text-on-surface-variant block mb-1">THRESHOLD</label>
+                            <input type="number" id="edit-threshold-${id}" value="${threshold}" class="notepad-line w-full text-xs">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-caps text-on-surface-variant block mb-1">LOCALITY</label>
+                            <input type="text" id="edit-locality-${id}" value="${locality}" class="notepad-line w-full text-xs">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-caps text-on-surface-variant block mb-1">IMAGE OPTION</label>
+                            <select id="edit-img-src-${id}" onchange="toggleEditImageInput(${id}, this.value)" class="notepad-line w-full text-xs">
+                                <option value="keep">Keep Current Image</option>
+                                <option value="url">Web URL</option>
+                                <option value="upload">Upload File</option>
+                                <option value="remove">Remove Image</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="edit-img-url-box-${id}" class="hidden mb-4">
+                        <label class="text-[9px] font-caps text-on-surface-variant block mb-1">NEW IMAGE URL</label>
+                        <input type="text" id="edit-img-url-${id}" value="${imageUrl}" class="notepad-line w-full text-xs">
+                    </div>
+                    <div id="edit-img-file-box-${id}" class="hidden mb-4">
+                        <label class="text-[9px] font-caps text-on-surface-variant block mb-1">UPLOAD NEW IMAGE FILE</label>
+                        <input type="file" id="edit-img-file-${id}" class="notepad-line w-full text-xs">
+                    </div>
+
+                    <div class="flex justify-end gap-2">
+                        <button onclick="fetchVendorProducts()" class="bg-surface border border-on-background px-3 py-1 text-xs">CANCEL</button>
+                        <button onclick="saveProductEdits(${id}, '${name.replace(/'/g, "\\'")}')" class="bg-primary text-white border border-on-background px-4 py-1 text-xs font-bold">SAVE CHANGES</button>
+                    </div>
+                </td>
+            `;
+        }
+
+        function toggleEditImageInput(id, val) {
+            const urlBox = document.getElementById(`edit-img-url-box-${id}`);
+            const fileBox = document.getElementById(`edit-img-file-box-${id}`);
+            urlBox.classList.add('hidden');
+            fileBox.classList.add('hidden');
+
+            if (val === 'url') {
+                urlBox.classList.remove('hidden');
+            } else if (val === 'upload') {
+                fileBox.classList.remove('hidden');
+            }
+        }
+
+        async function saveProductEdits(id, name) {
+            const price = parseFloat(document.getElementById(`edit-price-${id}`).value);
+            const stock = parseInt(document.getElementById(`edit-stock-${id}`).value);
+            const threshold = parseInt(document.getElementById(`edit-threshold-${id}`).value);
+            const locality = document.getElementById(`edit-locality-${id}`).value.trim();
+            
+            const imgSource = document.getElementById(`edit-img-src-${id}`).value;
+            let finalImageUrl = "";
+
+            if (imgSource === 'keep') {
+                // To keep, we retrieve it from input url (which has the old value)
+                finalImageUrl = document.getElementById(`edit-img-url-${id}`) ? document.getElementById(`edit-img-url-${id}`).value : "";
+            } else if (imgSource === 'remove') {
+                finalImageUrl = null;
+            } else if (imgSource === 'url') {
+                finalImageUrl = document.getElementById(`edit-img-url-${id}`).value.trim();
+            } else if (imgSource === 'upload') {
+                const fileInput = document.getElementById(`edit-img-file-${id}`);
+                if (fileInput.files.length > 0) {
+                    finalImageUrl = await uploadFileToServer(fileInput.files[0]);
+                    if (!finalImageUrl) {
+                        alert("❌ Image upload failed.");
+                        return;
+                    }
+                }
+            }
+
+            try {
+                const response = await fetch(`/products/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentUser.token}`
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        price: price,
+                        stock: stock,
+                        low_stock_threshold: threshold,
+                        locality: locality || null,
+                        image_url: finalImageUrl,
+                        vendor_id: currentUser.id
+                    })
+                });
+
+                if (response.ok) {
+                    alert("Product listing updated successfully!");
+                    fetchVendorProducts();
+                } else {
+                    const errDetail = await response.json();
+                    alert(`❌ Update Failed: ${errDetail.detail || 'Access restricted.'}`);
+                }
+            } catch (err) {
+                alert("❌ Server update connection failure.");
+            }
+        }
+
+        async function uploadFileToServer(file) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                const response = await fetch('/products/upload-image', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.image_url;
+                }
+            } catch (err) {
+                console.error("Upload error", err);
+            }
+            return null;
+        }
+
+        async function saveNewProduct() {
+            const name = document.getElementById('add-name').value.trim();
+            const price = parseFloat(document.getElementById('add-price').value || 0);
+            const stock = parseInt(document.getElementById('add-stock').value || 0);
+            const threshold = parseInt(document.getElementById('add-threshold').value || 10);
+            const locality = document.getElementById('add-locality').value.trim();
+            const imgSource = document.getElementById('add-img-source').value;
+
+            if (!name) {
+                alert("⚠️ Please provide a product name.");
+                return;
+            }
+
+            let finalImageUrl = null;
+
+            if (imgSource === 'auto') {
+                const term = name.replace(/\s+/g, '');
+                finalImageUrl = `https://loremflickr.com/640/480/${term}`;
+            } else if (imgSource === 'url') {
+                finalImageUrl = document.getElementById('add-img-url').value.trim();
+            } else if (imgSource === 'upload') {
+                const fileInput = document.getElementById('add-img-file');
+                if (fileInput.files.length > 0) {
+                    finalImageUrl = await uploadFileToServer(fileInput.files[0]);
+                    if (!finalImageUrl) {
+                        alert("❌ Image upload failed.");
+                        return;
+                    }
+                }
+            }
+
+            try {
+                const response = await fetch('/products', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentUser.token}`
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        price: price,
+                        stock: stock,
+                        low_stock_threshold: threshold,
+                        locality: locality || null,
+                        image_url: finalImageUrl,
+                        vendor_id: currentUser.id
+                    })
+                });
+
+                if (response.ok) {
+                    alert("✅ Product created successfully!");
+                    toggleAddProductForm();
+                    fetchVendorProducts();
+                    
+                    // Clear inputs
+                    document.getElementById('add-name').value = '';
+                    document.getElementById('add-price').value = '0.00';
+                    document.getElementById('add-stock').value = '10';
+                    document.getElementById('add-threshold').value = '5';
+                    document.getElementById('add-locality').value = '';
+                } else {
+                    const errDetail = await response.json();
+                    alert(`❌ Creation Failed: ${errDetail.detail || 'Access restricted.'}`);
+                }
+            } catch (err) {
+                alert("❌ Server connection error.");
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+/* style.css - Global design tokens for Nearby: Hyperlocal Marketplace */
+
+:root {
+    --primary: #c1502e;          /* Terracotta */
+    --on-primary: #ffffff;
+    --secondary: #3e5641;        /* Moss green */
+    --on-secondary: #ffffff;
+    --tertiary: #1c1b19;         /* Ink black */
+    --on-tertiary: #ffffff;
+    --background: #fdf9f2;       /* Warm off-white canvas */
+    --on-background: #1c1c18;
+    --surface: #fdfbf7;          /* Paper white */
+    --surface-container-low: #f7f3ec;
+    --surface-container-high: #ebe8e1;
+    --surface-container-highest: #e6e2db;
+    --outline: #8b716a;
+    --error: #ba1a1a;
+    --error-container: #ffdad6;
+    --on-error: #ffffff;
+}
+
+body {
+    background-color: var(--background);
+    color: var(--on-background);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    background-image: url("https://www.transparenttextures.com/patterns/natural-paper.png");
+}
+
+/* Typography styling */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Georgia', serif;
+    font-weight: 700;
+}
+
+.font-caps {
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+}
+
+/* Sharp elements */
+* {
+    border-radius: 0px !important;
+}
+
+/* Brutalist Block Shadows */
+.hard-shadow {
+    box-shadow: 4px 4px 0px 0px var(--tertiary);
+}
+
+.hard-shadow-active:active {
+    box-shadow: 1px 1px 0px 0px var(--tertiary) !important;
+    transform: translate(3px, 3px) !important;
+}
+
+/* double border effect */
+.double-rule {
+    border: 2px solid var(--tertiary);
+    position: relative;
+}
+.double-rule::after {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border: 1px solid var(--tertiary);
+    pointer-events: none;
+}
+
+/* Input notepad line style */
+.notepad-line {
+    border: none !important;
+    border-bottom: 1px solid var(--outline) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 4px 0 !important;
+}
+.notepad-line:focus {
+    outline: none !important;
+    border-bottom: 2px solid var(--primary) !important;
+    box-shadow: none !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--tertiary);
+    border: 2px solid var(--background);
+}
+
+/* Odometer styles */
+.odometer-digit {
+    display: inline-block;
+    height: 1.2em;
+    overflow: hidden;
+    line-height: 1.2em;
+    vertical-align: middle;
+}
+.odometer-strip {
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.6s cubic-bezier(0.45, 0, 0.55, 1);
+}
+
+/* Custom layout grid */
+.main-layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: 100vh;
+}
+@media (max-width: 768px) {
+    .main-layout {
+        grid-template-columns: 1fr;
+    }
+}

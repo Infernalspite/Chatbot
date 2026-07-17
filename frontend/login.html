@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Nearby Marketplace | Ledger Portal</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Georgia:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="/css/style.css" rel="stylesheet">
+</head>
+<body class="bg-background text-on-background flex flex-col justify-center items-center min-h-screen p-margin-mobile">
+
+    <!-- Top decorative banner -->
+    <div class="mb-8 text-center">
+        <h1 class="font-display-lg text-4xl text-primary uppercase tracking-tight">Nearby</h1>
+        <p class="font-caps text-[11px] text-on-surface-variant tracking-widest mt-1">VOL. 04 • LOCAL LEDGER GATEWAY</p>
+    </div>
+
+    <!-- Login Container Box -->
+    <div class="w-full max-w-[450px] bg-surface double-rule hard-shadow p-6 md:p-8">
+        
+        <!-- Auth View Selection -->
+        <div class="flex border-b-2 border-[#1c1b19] mb-6" id="auth-tabs">
+            <button onclick="switchView('login')" id="tab-login" class="flex-1 pb-2 font-caps text-xs text-primary border-b-2 border-primary font-bold">LOGIN</button>
+            <button onclick="switchView('register')" id="tab-register" class="flex-1 pb-2 font-caps text-xs text-on-surface-variant hover:text-primary transition-colors">REGISTER</button>
+        </div>
+
+        <!-- Login Section -->
+        <div id="login-section">
+            <p class="font-serif text-sm italic text-on-surface-variant mb-6 text-center">Inscribe your credentials to access the neighborhood listings.</p>
+            
+            <!-- Role Selection Slider -->
+            <div class="mb-6">
+                <label class="font-caps text-[10px] text-on-surface-variant block mb-2">ACCESS ROLE</label>
+                <div class="grid grid-cols-5 gap-1 bg-surface-container-low border border-[#1c1b19] p-1 text-center">
+                    <button onclick="selectRole('user')" id="role-user" class="py-1.5 text-[9px] font-caps bg-primary text-white font-bold transition-all">User</button>
+                    <button onclick="selectRole('vendor')" id="role-vendor" class="py-1.5 text-[9px] font-caps text-on-surface-variant hover:bg-surface-container-high transition-all">Vendor</button>
+                    <button onclick="selectRole('driver')" id="role-driver" class="py-1.5 text-[9px] font-caps text-on-surface-variant hover:bg-surface-container-high transition-all">Driver</button>
+                    <button onclick="selectRole('manager')" id="role-manager" class="py-1.5 text-[9px] font-caps text-on-surface-variant hover:bg-surface-container-high transition-all">Manager</button>
+                    <button onclick="selectRole('admin')" id="role-admin" class="py-1.5 text-[9px] font-caps text-on-surface-variant hover:bg-surface-container-high transition-all">Admin</button>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label for="username" class="font-caps text-[10px] text-on-surface-variant block mb-1">USERNAME</label>
+                    <input type="text" id="username" placeholder="e.g. John Doe" class="notepad-line w-full text-sm">
+                </div>
+                <div>
+                    <label for="password" class="font-caps text-[10px] text-on-surface-variant block mb-1">PASSWORD</label>
+                    <input type="password" id="password" placeholder="••••" class="notepad-line w-full text-sm">
+                </div>
+                
+                <div id="login-error" class="hidden bg-error-container text-error border border-error px-3 py-2 text-xs font-semibold"></div>
+
+                <button onclick="executeLogin()" class="w-full bg-primary text-white border-2 border-[#1c1b19] hard-shadow hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(28,27,25,1)] py-2.5 font-caps text-xs font-bold tracking-wider mt-4 block text-center">
+                    AUTHENTICATE
+                </button>
+            </div>
+        </div>
+
+        <!-- Register Section -->
+        <div id="register-section" class="hidden">
+            <p class="font-serif text-sm italic text-on-surface-variant mb-6 text-center">Join the marketplace ledger as a resident customer.</p>
+            
+            <div class="space-y-4">
+                <div>
+                    <label for="reg-name" class="font-caps text-[10px] text-on-surface-variant block mb-1">FULL NAME (USERNAME)</label>
+                    <input type="text" id="reg-name" placeholder="John Doe" class="notepad-line w-full text-sm">
+                </div>
+                <div>
+                    <label for="reg-email" class="font-caps text-[10px] text-on-surface-variant block mb-1">EMAIL ADDRESS</label>
+                    <input type="email" id="reg-email" placeholder="john@example.com" class="notepad-line w-full text-sm">
+                </div>
+                <div>
+                    <label for="reg-pass" class="font-caps text-[10px] text-on-surface-variant block mb-1">PASSWORD</label>
+                    <input type="password" id="reg-pass" placeholder="••••" class="notepad-line w-full text-sm">
+                </div>
+                
+                <div id="register-error" class="hidden bg-error-container text-error border border-error px-3 py-2 text-xs font-semibold"></div>
+                <div id="register-success" class="hidden bg-[#ceeace] text-[#09200f] border border-[#3e5641] px-3 py-2 text-xs font-semibold"></div>
+
+                <button onclick="executeRegister()" class="w-full bg-[#3e5641] text-white border-2 border-[#1c1b19] hard-shadow hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(28,27,25,1)] py-2.5 font-caps text-xs font-bold tracking-wider mt-4 block text-center">
+                    CREATE ACCOUNT
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Floating Chatbot script (injected manually on pages where DOM is ready) -->
+    <script src="/js/chatbot.js"></script>
+
+    <script>
+        let currentRole = 'user';
+
+        function switchView(view) {
+            const tabLogin = document.getElementById('tab-login');
+            const tabRegister = document.getElementById('tab-register');
+            const loginSec = document.getElementById('login-section');
+            const registerSec = document.getElementById('register-section');
+
+            if (view === 'login') {
+                tabLogin.className = "flex-1 pb-2 font-caps text-xs text-primary border-b-2 border-primary font-bold";
+                tabRegister.className = "flex-1 pb-2 font-caps text-xs text-on-surface-variant hover:text-primary transition-colors";
+                loginSec.classList.remove('hidden');
+                registerSec.classList.add('hidden');
+            } else {
+                tabRegister.className = "flex-1 pb-2 font-caps text-xs text-primary border-b-2 border-primary font-bold";
+                tabLogin.className = "flex-1 pb-2 font-caps text-xs text-on-surface-variant hover:text-primary transition-colors";
+                loginSec.classList.add('hidden');
+                registerSec.classList.remove('hidden');
+            }
+        }
+
+        function selectRole(role) {
+            const roles = ['user', 'vendor', 'driver', 'manager', 'admin'];
+            roles.forEach(r => {
+                const btn = document.getElementById(`role-${r}`);
+                if (r === role) {
+                    btn.className = "py-1.5 text-[9px] font-caps bg-primary text-white font-bold transition-all";
+                } else {
+                    btn.className = "py-1.5 text-[9px] font-caps text-on-surface-variant hover:bg-surface-container-high transition-all";
+                }
+            });
+            currentRole = role;
+        }
+
+        async function executeLogin() {
+            const usernameInput = document.getElementById('username').value.trim();
+            const passwordInput = document.getElementById('password').value;
+            const errorDiv = document.getElementById('login-error');
+            
+            errorDiv.classList.add('hidden');
+
+            if (!usernameInput || !passwordInput) {
+                errorDiv.textContent = "⚠️ Inscribe username and password.";
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const response = await fetch('/users/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: usernameInput,
+                        password: passwordInput
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        const user = data[0];
+                        if (user.role !== currentRole) {
+                            errorDiv.textContent = `❌ Unauthorized role matching. This credentials do not belong to role ${currentRole.toUpperCase()}.`;
+                            errorDiv.classList.remove('hidden');
+                            return;
+                        }
+
+                        // Store current user in localStorage
+                        localStorage.setItem('currentUser', JSON.stringify({
+                            id: user.id,
+                            name: user.name,
+                            email: user.email,
+                            role: user.role,
+                            token: user.token
+                        }));
+
+                        // Redirect to home page (index.html) or dashboard
+                        if (user.role === 'vendor') {
+                            window.location.href = '/vendor.html';
+                        } else if (user.role === 'driver') {
+                            window.location.href = '/driver.html';
+                        } else if (user.role === 'admin' || user.role === 'manager') {
+                            window.location.href = '/insights.html';
+                        } else {
+                            window.location.href = '/index.html';
+                        }
+                    }
+                } else {
+                    const errorDetail = await response.json();
+                    errorDiv.textContent = `❌ Error: ${errorDetail.detail || 'Credentials invalid.'}`;
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorDiv.textContent = "❌ Server error. Inability to verify credentials.";
+                errorDiv.classList.remove('hidden');
+            }
+        }
+
+        async function executeRegister() {
+            const name = document.getElementById('reg-name').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const password = document.getElementById('reg-pass').value;
+            const errorDiv = document.getElementById('register-error');
+            const successDiv = document.getElementById('register-success');
+
+            errorDiv.classList.add('hidden');
+            successDiv.classList.add('hidden');
+
+            if (!name || !email || !password) {
+                errorDiv.textContent = "⚠️ Fill all information grids.";
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const response = await fetch('/users', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        email: email,
+                        password: password
+                    })
+                });
+
+                if (response.ok) {
+                    successDiv.textContent = "✅ Account registered in the ledger. Redirecting to login...";
+                    successDiv.classList.remove('hidden');
+                    setTimeout(() => {
+                        switchView('login');
+                        selectRole('user');
+                        document.getElementById('username').value = name;
+                        document.getElementById('password').value = password;
+                    }, 2000);
+                } else {
+                    const errDetail = await response.json();
+                    errorDiv.textContent = `❌ Error: ${errDetail.detail || 'Failed to create resident.'}`;
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorDiv.textContent = "❌ Server connection failure.";
+                errorDiv.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
