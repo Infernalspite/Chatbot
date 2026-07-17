@@ -67,7 +67,7 @@ def serve_index():
     return FileResponse(str(_FRONTEND / "index.html"))
 
 
-_HTML_PAGES = ["login", "cart", "product", "vendor", "driver", "insights"]
+_HTML_PAGES = ["index", "login", "cart", "product", "vendor", "driver", "insights"]
 
 for _page in _HTML_PAGES:
     _path = f"/{_page}.html"
