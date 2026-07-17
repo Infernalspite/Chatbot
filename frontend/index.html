@@ -12,10 +12,10 @@
 <body class="bg-background text-on-background font-body-base antialiased">
 
     <!-- Top sticky AppBar -->
-    <header class="w-full top-0 sticky z-40 bg-background border-b-2 border-on-background shadow-[4px_4px_0px_0px_rgba(28,27,25,1)]">
-        <div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop py-stack-md max-w-[1200px] mx-auto">
+    <header id="site-header" class="w-full top-0 sticky z-40 bg-background border-b-2 border-on-background shadow-[4px_4px_0px_0px_rgba(28,27,25,1)]">
+        <div class="flex justify-between items-center px-4 md:px-12 py-3 max-w-[1200px] mx-auto">
             <div class="flex items-center gap-4">
-                <button class="hover:bg-primary-fixed-dim transition-all p-2 active:translate-x-1 active:translate-y-1 active:shadow-none">
+                <button id="menu-btn" onclick="toggleSidebar()" class="hover:bg-primary-fixed-dim transition-all p-2 active:translate-x-1 active:translate-y-1 active:shadow-none">
                     <span class="material-symbols-outlined text-primary">menu</span>
                 </button>
                 <h1 class="font-display-lg text-display-lg-mobile text-primary uppercase tracking-tight" onclick="window.location.reload()" style="cursor:pointer">Nearby</h1>
@@ -39,7 +39,7 @@
         <div class="max-w-[1200px] mx-auto main-layout">
             
             <!-- Side Navigation category rail -->
-            <aside class="hidden md:flex flex-col border-r-2 border-on-background py-stack-lg pr-margin-mobile h-screen sticky top-[80px] justify-between">
+            <aside id="desktop-sidebar" class="hidden md:flex flex-col border-r-2 border-on-background py-6 overflow-y-auto sticky justify-between" style="top:52px;height:calc(100vh - 52px)">
                 <div class="mb-stack-lg">
                     <h2 class="font-caps text-[10px] text-on-surface-variant mb-4 px-2">CATEGORIES</h2>
                     <nav class="space-y-2" id="category-rail">
@@ -73,7 +73,7 @@
             </aside>
 
             <!-- Product Grid Content -->
-            <section class="p-margin-mobile md:p-margin-desktop pb-32">
+            <section class="p-4 md:p-10 pb-32">
                 
                 <!-- Flash banner -->
                 <div class="bg-primary text-white p-3 border-2 border-on-background hard-shadow flex justify-between items-center mb-8 rotate-[-0.5deg]">
@@ -138,6 +138,24 @@
                 </div>
             </section>
         </div>
+
+    <!-- Mobile Sidebar Overlay -->
+    <div id="mobile-sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 z-[998] hidden"></div>
+    <div id="mobile-sidebar" class="fixed top-0 left-0 h-full w-[280px] bg-background border-r-2 border-on-background z-[999] flex flex-col transform -translate-x-full transition-transform duration-300 overflow-y-auto">
+        <div class="flex items-center justify-between px-4 py-4 border-b-2 border-on-background">
+            <span class="font-caps text-xs text-primary">CATEGORIES</span>
+            <button onclick="toggleSidebar()" class="p-2 hover:bg-surface-container-high">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <nav class="space-y-1 p-3 flex-1">
+            <button onclick="filterCategory('All');toggleSidebar()" class="w-full flex items-center gap-3 p-3 font-semibold bg-primary text-white border-2 border-on-background text-left text-sm"><span class="material-symbols-outlined">category</span>All Listings</button>
+            <button onclick="filterCategory('Electronics');toggleSidebar()" class="w-full flex items-center gap-3 p-3 font-semibold text-on-surface-variant hover:bg-surface-container-highest border-2 border-transparent text-left text-sm"><span class="material-symbols-outlined">devices</span>Electronics</button>
+            <button onclick="filterCategory('Furniture');toggleSidebar()" class="w-full flex items-center gap-3 p-3 font-semibold text-on-surface-variant hover:bg-surface-container-highest border-2 border-transparent text-left text-sm"><span class="material-symbols-outlined">chair</span>Furniture</button>
+            <button onclick="filterCategory('Cosmetics');toggleSidebar()" class="w-full flex items-center gap-3 p-3 font-semibold text-on-surface-variant hover:bg-surface-container-highest border-2 border-transparent text-left text-sm"><span class="material-symbols-outlined">face</span>Cosmetics</button>
+            <button onclick="filterCategory('Other');toggleSidebar()" class="w-full flex items-center gap-3 p-3 font-semibold text-on-surface-variant hover:bg-surface-container-highest border-2 border-transparent text-left text-sm"><span class="material-symbols-outlined">more_horiz</span>Other</button>
+        </nav>
+    </div>
     </main>
 
     <!-- Bottom Navigation on Mobile -->
@@ -160,6 +178,40 @@
     <script src="/js/chatbot.js"></script>
 
     <script>
+
+        // Sidebar toggle (desktop collapse + mobile overlay)
+        function toggleSidebar() {
+            const isMobile = window.innerWidth < 768;
+            if (isMobile) {
+                const overlay = document.getElementById('mobile-sidebar-overlay');
+                const panel   = document.getElementById('mobile-sidebar');
+                const isOpen  = !panel.classList.contains('-translate-x-full');
+                if (isOpen) {
+                    panel.classList.add('-translate-x-full');
+                    overlay.classList.add('hidden');
+                } else {
+                    panel.classList.remove('-translate-x-full');
+                    overlay.classList.remove('hidden');
+                }
+            } else {
+                const sidebar = document.getElementById('desktop-sidebar');
+                sidebar.classList.toggle('hidden');
+                sidebar.classList.toggle('md:flex');
+            }
+        }
+
+        // Sync sidebar top/height to actual header height
+        function syncSidebarToHeader() {
+            const hdr = document.getElementById('site-header');
+            const sidebar = document.getElementById('desktop-sidebar');
+            if (!hdr || !sidebar) return;
+            const h = hdr.getBoundingClientRect().height;
+            sidebar.style.top    = h + 'px';
+            sidebar.style.height = 'calc(100vh - ' + h + 'px)';
+        }
+        window.addEventListener('DOMContentLoaded', syncSidebarToHeader);
+        window.addEventListener('resize', syncSidebarToHeader);
+
         let selectedCategory = 'All';
 
         // Check authentication

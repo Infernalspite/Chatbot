@@ -1,6 +1,8 @@
 // chatbot.js - Bookkeeper's Drawer (Floating Chatbot Widget)
 
 (function () {
+    // Only show chatbot for authenticated users
+    if (!localStorage.getItem('currentUser')) return;
     // Injects stylesheet for chatbot
     const style = document.createElement('style');
     style.innerHTML = `
