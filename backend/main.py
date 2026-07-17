@@ -10,6 +10,7 @@ import re
 import shutil
 import uuid
 import random
+import requests as http_requests
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from pathlib import Path as FilePath
@@ -24,6 +25,7 @@ import rbac
 import mange
 import chatbot
 import recommendations  # ← RECOMMENDATION ENGINE
+import analytics         # ← NEW: Admin analytics router
 from setup_db import setup as setup_database
 from product_classifier import (
     CATEGORIES,
@@ -59,6 +61,7 @@ app.include_router(rbac.router)
 app.include_router(mange.router)
 app.include_router(chatbot.router)
 app.include_router(recommendations.router)  # ← RECOMMENDATION ENGINE
+app.include_router(analytics.router)         # ← NEW: Admin analytics
 
 
 DELIVERY_STATUSES = [
@@ -235,10 +238,91 @@ def get_products():
     try:
         connection = DB_connection()
         with connection.cursor() as cursor:
-            sql = "SELECT id, name, price, stock, image_url, ai_category, ai_categories, ai_processed FROM products"
+            sql = """SELECT id, name, price, stock, image_url, ai_category, ai_categories, ai_processed,
+                           COALESCE(locality, '') AS locality, COALESCE(vendor_id, 0) AS vendor_id,
+                           COALESCE(low_stock_threshold, 10) AS low_stock_threshold
+                    FROM products"""
             cursor.execute(sql)
             result = cursor.fetchall()
             return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        connection.close()
+
+
+# ── NEW: Bulk stock-status endpoint (hyperlocal real-time polling) ─────────────
+@app.get("/products/stock-status")
+def get_stock_status():
+    """Return live stock levels for all products — used for real-time polling."""
+    try:
+        connection = DB_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT id, name, stock,
+                          COALESCE(low_stock_threshold, 10) AS low_stock_threshold,
+                          COALESCE(locality, '') AS locality
+                   FROM products ORDER BY id"""
+            )
+            rows = cursor.fetchall()
+        result = []
+        for r in rows:
+            stock = int(r["stock"] or 0)
+            threshold = int(r["low_stock_threshold"] or 10)
+            if stock <= 0:
+                status = "out_of_stock"
+            elif stock <= threshold:
+                status = "low_stock"
+            else:
+                status = "in_stock"
+            result.append({
+                "id": r["id"],
+                "name": r["name"],
+                "stock": stock,
+                "low_stock_threshold": threshold,
+                "locality": r["locality"],
+                "status": status,
+            })
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        connection.close()
+
+
+# ── NEW: Vendor products endpoint ─────────────────────────────────────────────
+@app.get("/vendor/products")
+def get_vendor_products(vendor_id: int = Query(...)):
+    """Return only the products owned by a specific vendor (by user id)."""
+    try:
+        connection = DB_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT id, name, price, stock, image_url, ai_category,
+                          COALESCE(locality, '') AS locality,
+                          COALESCE(low_stock_threshold, 10) AS low_stock_threshold
+                   FROM products WHERE vendor_id = %s ORDER BY id DESC""",
+                (vendor_id,),
+            )
+            return cursor.fetchall()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        connection.close()
+
+
+# ── NEW: Get unique localities ─────────────────────────────────────────────────
+@app.get("/products/localities")
+def get_localities():
+    """Return distinct locality values for the hyperlocal neighborhood filter."""
+    try:
+        connection = DB_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT DISTINCT locality FROM products WHERE locality IS NOT NULL AND locality != '' ORDER BY locality"
+            )
+            rows = cursor.fetchall()
+        return [r["locality"] for r in rows]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -253,14 +337,18 @@ def create_product_api(product: Product, background_tasks: BackgroundTasks):
         with connection.cursor() as cursor:
             if DB_TYPE == "mysql":
                 cursor.execute(
-                    "INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s)",
-                    (product.name, product.price, product.stock, product.image_url),
+                    """INSERT INTO products (name, price, stock, image_url, locality, vendor_id, low_stock_threshold)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                    (product.name, product.price, product.stock, product.image_url,
+                     product.locality, product.vendor_id, product.low_stock_threshold),
                 )
                 product_id = cursor.lastrowid
             else:
                 cursor.execute(
-                    "INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s) RETURNING id",
-                    (product.name, product.price, product.stock, product.image_url),
+                    """INSERT INTO products (name, price, stock, image_url, locality, vendor_id, low_stock_threshold)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+                    (product.name, product.price, product.stock, product.image_url,
+                     product.locality, product.vendor_id, product.low_stock_threshold),
                 )
                 product_id = cursor.fetchone()["id"]
             connection.commit()
@@ -280,7 +368,8 @@ def get_categorized_products():
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT id, name, price, stock, image_url, ai_category, ai_categories, ai_processed
+                SELECT id, name, price, stock, image_url, ai_category, ai_categories, ai_processed,
+                       COALESCE(locality, '') AS locality
                 FROM products
                 ORDER BY ai_category, name
                 """
@@ -392,7 +481,7 @@ def _infer_filter_intent(filter_request: ProductFilterRequest) -> dict:
     }
 
     try:
-        response = requests.post(
+        response = http_requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={
                 "Content-Type": "application/json",
@@ -450,12 +539,14 @@ def _infer_filter_intent(filter_request: ProductFilterRequest) -> dict:
 @app.post("/api/products/filter")
 def filter_products(filter_request: ProductFilterRequest):
     intent = _infer_filter_intent(filter_request)
+    locality_filter = getattr(filter_request, "locality", None)
     try:
         connection = DB_connection()
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT id, name, price, stock, image_url, ai_category, ai_categories, ai_processed
+                SELECT id, name, price, stock, image_url, ai_category, ai_categories, ai_processed,
+                       COALESCE(locality, '') AS locality
                 FROM products
                 """
             )
@@ -471,6 +562,7 @@ def filter_products(filter_request: ProductFilterRequest):
         name = (product.get("name") or "").lower()
         price = float(product.get("price") or 0)
         stock = int(product.get("stock") or 0)
+        locality = (product.get("locality") or "").lower()
 
         if intent["categories"] and not set(intent["categories"]) & set(categories):
             continue
@@ -481,6 +573,9 @@ def filter_products(filter_request: ProductFilterRequest):
         if intent["max_price"] is not None and price > float(intent["max_price"]):
             continue
         if intent["keywords"] and not all(word in name for word in intent["keywords"]):
+            continue
+        # Hyperlocal: neighborhood filter
+        if locality_filter and locality_filter.lower() not in locality:
             continue
 
         product["ai_categories"] = categories
@@ -534,6 +629,7 @@ def upload_image(file: UploadFile = File(...)):
 
 @app.post("/orders")
 def create_order(payload: Order):
+    """Create order with atomic stock reservation — prevents overselling."""
     try:
         connection = DB_connection()
         with connection.cursor() as cursor:
@@ -543,18 +639,42 @@ def create_order(payload: Order):
             else:
                 cursor.execute("INSERT INTO orders (user_id) VALUES (%s) RETURNING id", (payload.user_id,))
                 order_id = cursor.fetchone()["id"]
-            
+
+            # ── Atomic stock reservation with concurrency guard ────────────
             sql_item = "INSERT INTO order_items (order_id, product_id, quantity) VALUES (%s, %s, %s)"
             for item in payload.items:
+                # Atomically decrement stock only if sufficient quantity exists
+                if DB_TYPE == "mysql":
+                    cursor.execute(
+                        """UPDATE products
+                           SET stock = stock - %s
+                           WHERE id = %s AND stock >= %s""",
+                        (item.quantity, item.product_id, item.quantity),
+                    )
+                else:
+                    cursor.execute(
+                        """UPDATE products
+                           SET stock = stock - %s
+                           WHERE id = %s AND stock >= %s""",
+                        (item.quantity, item.product_id, item.quantity),
+                    )
+                if cursor.rowcount == 0:
+                    connection.rollback()
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Insufficient stock for product {item.product_id}. Order cancelled.",
+                    )
                 cursor.execute(sql_item, (order_id, item.product_id, item.quantity))
+
             driver_id = assign_delivery(cursor, order_id)
-            
             connection.commit()
             return {
                 "message": "Order created successfully",
                 "order_id": order_id,
                 "driver_id": driver_id,
             }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -691,4 +811,3 @@ def get_items():
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         connection.close()
-
